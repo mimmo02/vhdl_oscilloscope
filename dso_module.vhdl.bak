@@ -1,0 +1,57 @@
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
+use work.led_matrix_pkg.all;
+
+entity dso_module is
+    port (  clk_148_5_MHz       : in std_logic;
+            reset               : in std_logic;
+
+            -- buttons
+            btn_sel_channel     : in std_logic;
+            btn_sel_parameter   : in std_logic;
+            btn_sel_acq_mode    : in std_logic;
+            btn_run             : in std_logic;
+            btn_plus            : in std_logic;
+            btn_minus           : in std_logic;
+
+            -- hdmi interface
+            HSYNC               : out std_logic;
+            VSYNC               : out std_logic;
+            RED                 : out std_logic;
+            GREEN               : out std_logic;
+            BLUE                : out std_logic;
+            HDMI_CLOCK          : out std_logic;
+            ACTIVE_VIDEO        : out std_logic;
+
+            -- dac interface
+            nCS_DA2             : out std_logic;
+            D0_DA2              : out std_logic;
+            D1_DA2              : out std_logic;
+            SCK_DA2             : out std_logic;
+
+            -- adc interface
+            nCS_AD1             : out std_logic;
+            D0_AD1              : in std_logic;
+            D1_AD1              : in std_logic;
+            SCK_AD1             : out std_logic;
+
+            -- ssd
+            seg1                : out std_logic_vector(6 downto 0);
+            seg2                : out std_logic_vector(6 downto 0);
+            seg3                : out std_logic_vector(6 downto 0);
+            seg4                : out std_logic_vector(6 downto 0);
+
+            -- led matrix
+            led_matrix          : out led_array);
+end entity dso_module;
+
+
+architecture platform_independent of dso_module is
+
+begin
+
+    -- implement your system here
+
+end architecture platform_independent;
