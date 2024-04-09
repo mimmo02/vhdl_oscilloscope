@@ -1,3 +1,15 @@
+
+---------------------------------------------------------------------------------------------------------------
+-- File: display_transmission.vhd
+-- Author: Domenico Aquilino <aquid1@bfh.ch>
+-- Date: 2024-04-05
+-- Version: 1.0
+
+-- description: This file contains the VHDL code for the display transmission module. This module is responsible
+-- for generating the timing signals for the HDMI display. The module generates the horizontal and vertical
+-- timing signals, the pixel clock signal, the horizontal and vertical sync signals, the active video signal
+-- and the index signals for the horizontal and vertical position of the pixel. T
+---------------------------------------------------------------------------------------------------------------
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;

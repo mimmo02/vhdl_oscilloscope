@@ -1,3 +1,14 @@
+---------------------------------------------------------------------------------------------------------------
+-- File: display_module.vhd
+-- Author: Domenico Aquilino <aquid1@bfh.ch>
+-- Date: 2024-04-05
+-- Version: 1.0
+
+-- description: This file contains the VHDL code for the display module. The display module is responsible for
+-- displaying the data of the two channels on the screen. The display module receives the data of the two channels
+-- and the trigger data. The display module is responsible for displaying the data of the two channels on the screen.
+-- The display module receives the data of the two channels and the trigger data.
+---------------------------------------------------------------------------------------------------------------
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -48,12 +59,26 @@ constant c_square_height : integer := c_lines_v / c_num_square_v;
 
 -- pixel signals
 signal s_pixel_out           : std_logic_vector(2 downto 0);
-signal s_pixel_grid          : std_logic_vector(2 downto 0);
-signal s_pixel_border        : std_logic_vector(2 downto 0);
-signal s_pixel_ch1_offset    : std_logic_vector(2 downto 0);
-signal s_pixel_ch2_offset    : std_logic_vector(2 downto 0);
-signal s_pixel_trigger_pos   : std_logic_vector(2 downto 0);
-signal s_pixel_trigger_ampl  : std_logic_vector(2 downto 0);
+signal s_pixel_grid          : std_logic;
+signal s_pixel_border        : std_logic;
+signal s_ch1_offset          : std_logic;
+signal s_ch2_offset          : std_logic;
+signal s_pixel_trigger_pos   : std_logic;
+signal s_pixel_trigger_ampl  : std_logic;
+signal s_ch1_sample_pre      : std_logic_vector(9 downto 0);
+signal s_ch2_sample_pre      : std_logic_vector(9 downto 0);
+signal s_trigger_color       : std_logic_vector(2 downto 0);
+signal s_ch1                 : std_logic;
+signal s_ch2                 : std_logic;
+signal s_ch1_dot             : std_logic;
+signal s_ch1_vert            : std_logic;
+signal s_ch2_dot             : std_logic;
+signal s_ch2_vert            : std_logic;
+
+signal s_NextLine            : std_logic;
+signal s_NextScreen          : std_logic;
+signal s_ACTIVE_VIDEO        : std_logic;
+signal s_HDMI_CLOCK          : std_logic;
 
 begin
 
@@ -77,16 +102,177 @@ begin
         port map(
             clk_148_5_MHz => clk_148_5_MHz,
             reset         => reset,      
-            nextScreen    => NextScreen,  
-            nextLine      => NextLine,  
+            nextScreen    => s_NextScreen,  
+            nextLine      => s_NextLine,  
             index_h       => s_index_h,   
             index_v       => s_index_v,
-            ACTIVE_VIDEO  => ACTIVE_VIDEO,
-            HDMI_CLOCK    => HDMI_CLOCK,
+            ACTIVE_VIDEO  => s_ACTIVE_VIDEO,
+            HDMI_CLOCK    => s_HDMI_CLOCK,
             HSYNC         => HSYNC,
             VSYNC         => VSYNC
         );
 
+    NextLine <= s_NextLine;
+    NextScreen <= s_NextScreen;
+    ACTIVE_VIDEO <= s_ACTIVE_VIDEO;
+    HDMI_CLOCK <= s_HDMI_CLOCK;
+
+    RequestSample <= '1' when s_ACTIVE_VIDEO = '1' and s_HDMI_CLOCK = '1' else
+                     '0';
+    -----------------------------------------------------------------------------------------------
+    -- GRID DISPLAY
+    -----------------------------------------------------------------------------------------------
+    -- GRID: yellow: "110"   
+    s_pixel_grid <= '1' when unsigned(s_index_h) mod c_square_width = 0 or unsigned(s_index_v) mod c_square_height = 0 else
+                    '0';
+
+    --BORDER: yellow: "110"
+    s_pixel_border <= '1' when unsigned(s_index_h) = 1 or
+                                 unsigned(s_index_h) = c_pixels_h or
+                                 unsigned(s_index_v) = 1 or
+                                 unsigned(s_index_v) = c_lines_v else
+                      '0';
+    -----------------------------------------------------------------------------------------------
+    -- OFFSET DISPLAY
+    -----------------------------------------------------------------------------------------------
+    -- channel 1 offset: cyan = "011"
+    s_ch1_offset <= '1' when unsigned(s_index_h) < (c_square_width/2) and
+                               unsigned(s_index_v) = (c_lines_v - unsigned(ChannelOneOffset)) else
+                    '0';
+    -- channel 2 offset: magenta = "101"
+    s_ch2_offset <= '1' when unsigned(s_index_h) < (c_square_width/2) and
+                               unsigned(s_index_v) = (c_lines_v - unsigned(ChannelTwoOffset)) else
+                    '0';
+    -----------------------------------------------------------------------------------------------
+    -- TRIGGER DISPLAY
+    -----------------------------------------------------------------------------------------------
+    -- trigger position display
+    s_pixel_trigger_pos <= '1' when unsigned(s_index_h) = unsigned(TriggerPoint) and
+                                                   unsigned(s_index_v) < (c_square_height/2) else
+                           '0';
+    -- trigger amplitude display
+    s_pixel_trigger_ampl <= '1' when unsigned(s_index_h) > (9*c_square_width + c_square_width/2) and                   
+                                                    unsigned(s_index_v) = (c_lines_v - unsigned(TriggerLevel)) else
+                            '0';
+    -----------------------------------------------------------------------------------------------
+    -- CHANNEL DISPLAY
+    -----------------------------------------------------------------------------------------------
+
+    SAMPLE_PRE : process(clk_148_5_MHz,reset)
+    begin
+        if reset = '1' then 
+            s_ch1_sample_pre <= (others => '0');
+            s_ch2_sample_pre <= (others => '0');
+        elsif rising_edge(clk_148_5_MHz) then
+            if s_ACTIVE_VIDEO = '1' and s_HDMI_CLOCK = '0' then
+                s_ch1_sample_pre <= ChannelOneSample;
+                s_ch2_sample_pre <= ChannelTwoSample;
+            end if;
+        end if;
+    end process SAMPLE_PRE;
+
+
+    -- CH1 : process(ChannelOneSample, s_index_v, s_index_h, ChannelOneOn, ChannelOneDot)
+    -- variable v_index_v : unsigned(9 downto 0);
+    -- begin
+    --     v_index_v := c_lines_v - unsigned(s_index_v) + 1;
+    --     s_ch1 <= '0';
+    --     if s_ACTIVE_VIDEO = '1' then
+    --         if ChannelOneOn = '1' then                                     -- channel 1 is active
+    --             if ChannelOneDot = '1' then
+    --                 if v_index_v = unsigned(ChannelOneSample) then         -- display sample dot
+    --                     s_ch1 <= '1';
+    --                 end if;
+    --             elsif ChannelOneDot = '0' then                             -- display vertical line
+    --                 if unsigned(ChannelOneSample) >= unsigned(s_ch1_sample_pre) then  -- sample is higher than before
+    --                     if v_index_v >= unsigned(s_ch1_sample_pre) and v_index_v <= unsigned(ChannelOneSample) then  
+    --                         s_ch1 <= '1';
+    --                     end if;
+    --                 elsif unsigned(ChannelOneSample) <= unsigned(s_ch1_sample_pre) then  -- sample is lower than before                      
+    --                     if v_index_v <= unsigned(s_ch1_sample_pre) and v_index_v >= unsigned(ChannelOneSample) then
+    --                         s_ch1 <= '1';                                  
+    --                     end if;
+    --                 end if;
+    --             end if;
+    --         end if;
+    --     end if;
+    -- end process CH1;
+
+
+    s_ch1_dot <= '1' when (c_lines_v - unsigned(s_index_v)) = unsigned(ChannelOneSample) else
+                 '0';
+
+    s_ch1_vert <= '1' when unsigned(ChannelOneSample) >= unsigned(s_ch1_sample_pre) and
+                           (c_lines_v - unsigned(s_index_v)) >= unsigned(s_ch1_sample_pre) and
+                           (c_lines_v - unsigned(s_index_v)) <= unsigned(ChannelOneSample) else
+                  '1' when unsigned(ChannelOneSample) <= unsigned(s_ch1_sample_pre) and
+                           (c_lines_v - unsigned(s_index_v)) <= unsigned(s_ch1_sample_pre) and
+                           (c_lines_v - unsigned(s_index_v)) >= unsigned(ChannelOneSample) else
+                  '0';
+                
+    s_ch1 <= s_ch1_dot or s_ch1_vert when ChannelOneOn = '1' and ChannelOneDot = '0' else
+             s_ch1_dot               when ChannelOneOn = '1' and ChannelOneDot = '1' else
+             '0';
+
+    s_ch2_dot <= '1' when (c_lines_v - unsigned(s_index_v)) = unsigned(ChannelTwoSample) else
+                 '0';
+
+    s_ch2_vert <= '1' when unsigned(ChannelTwoSample) >= unsigned(s_ch2_sample_pre) and
+                           (c_lines_v - unsigned(s_index_v)) >= unsigned(s_ch2_sample_pre) and
+                           (c_lines_v - unsigned(s_index_v)) <= unsigned(ChannelTwoSample) else
+                  '1' when unsigned(ChannelTwoSample) <= unsigned(s_ch2_sample_pre) and
+                           (c_lines_v - unsigned(s_index_v)) <= unsigned(s_ch2_sample_pre) and
+                           (c_lines_v - unsigned(s_index_v)) >= unsigned(ChannelTwoSample) else
+                  '0';
+
+    s_ch2 <= s_ch2_dot or s_ch2_vert when ChannelTwoOn = '1' and ChannelTwoDot = '0' else
+             s_ch2_dot               when ChannelTwoOn = '1' and ChannelTwoDot = '1' else
+             '0';
+
+    -- CH2 : process(ChannelTwoSample, s_index_v, s_index_h, ChannelTwoOn, ChannelTwoDot)
+    -- variable v_index_v : unsigned(9 downto 0);
+    -- begin
+    --     v_index_v := c_lines_v - unsigned(s_index_v) + 1;
+    --     s_ch2 <= '0';
+    --     if s_ACTIVE_VIDEO = '1' then
+    --         if ChannelTwoOn = '1' then                                     -- channel 1 is active
+    --             if ChannelTwoDot = '1' then
+    --                 if v_index_v = unsigned(ChannelTwoSample) then         -- display sample dot
+    --                     s_ch2 <= '1';
+    --                 end if;
+    --             elsif ChannelTwoDot = '0' then                             -- display vertical line
+    --                 if unsigned(ChannelTwoSample) >= unsigned(s_ch2_sample_pre) then  -- sample is higher than before
+    --                     if v_index_v >= unsigned(s_ch2_sample_pre) and v_index_v <= unsigned(ChannelTwoSample) then  
+    --                         s_ch2 <= '1';
+    --                     end if;
+    --                 elsif unsigned(ChannelTwoSample) <= unsigned(s_ch2_sample_pre) then  -- sample is lower than before                      
+    --                     if v_index_v <= unsigned(s_ch2_sample_pre) and v_index_v >= unsigned(ChannelTwoSample) then
+    --                         s_ch2 <= '1';                                  
+    --                     end if;
+    --                 end if;
+    --             end if;
+    --         end if;
+    --     end if;
+    -- end process CH2;
+    
+
+
+    -----------------------------------------------------------------------------------------------
+    -- PIXEL OUT SUPERPOSITION 
+    -----------------------------------------------------------------------------------------------
+
+    s_trigger_color <= "011" when TriggerChannelOne = '1' else
+                       "101";
+
+    s_pixel_out <= s_trigger_color when s_pixel_trigger_pos = '1' else               -- high priority of superposition
+                   s_trigger_color when s_pixel_trigger_ampl = '1' else
+                   "011" when s_ch1_offset = '1' and ChannelOneOn = '1' else                           
+                   "101" when s_ch2_offset = '1' and ChannelTwoOn = '1' else
+                   "111" when s_ch1 = '1' and s_ch2 = '1' else
+                   "011" when s_ch1 = '1' else
+                   "101" when s_ch2 = '1' else
+                   "110" when s_pixel_grid = '1' or s_pixel_border = '1' else       -- low priority of superposition
+                   "000";
 
     -----------------------------------------------------------------------------------------------
     -- PIXELS ASSIGNMENT
@@ -97,55 +283,6 @@ begin
              '0';
     BLUE <=  '1' when s_pixel_out(0) = '1' else
              '0';
-    -----------------------------------------------------------------------------------------------
-    -- GRID DISPLAY
-    -----------------------------------------------------------------------------------------------
-    -- GRID: yellow: "110"   
-    s_pixel_grid <= "110" when to_integer(unsigned(s_index_h)) mod c_square_width = 0 or to_integer(unsigned(s_index_v)) mod c_square_height = 0 else
-                    "000";
-
-    --BORDER: yellow: "110"
-    s_pixel_border <= "110" when to_integer(unsigned(s_index_h)) = 1 or
-                          to_integer(unsigned(s_index_h)) = 1280 or
-                          to_integer(unsigned(s_index_v)) = 1 or
-                          to_integer(unsigned(s_index_v)) = 720 else
-                      "000";
-
-    -----------------------------------------------------------------------------------------------
-    -- OFFSET DISPLAY
-    -----------------------------------------------------------------------------------------------
-    -- channel 1: cyan: "011"
-    s_pixel_ch1_offset <= "011" when to_integer(unsigned(s_index_h)) < (c_square_width/2) and
-                                     to_integer(unsigned(s_index_v)) = (c_lines_v - 45) else        -- change 45 with the level
-                          "000";
-
-    -- channel 2: magenta: "101"
-    s_pixel_ch2_offset <= "101" when to_integer(unsigned(s_index_h)) < (c_square_width/2) and
-                                     to_integer(unsigned(s_index_v)) = (c_lines_v - 135) else        -- change 135 with the level
-                          "000";
-
-    -----------------------------------------------------------------------------------------------
-    -- TRIGGER DISPLAY
-    -----------------------------------------------------------------------------------------------
-    s_pixel_trigger_pos <= "011" when to_integer(unsigned(s_index_h)) = 576 and                    -- change 576 with the position
-                                      to_integer(unsigned(s_index_v)) < (c_square_height/2) else
-                           "000";
-
-    s_pixel_trigger_ampl <= "011" when to_integer(unsigned(s_index_h)) > (9*c_square_width + c_square_width/2) and                   
-                                       to_integer(unsigned(s_index_v)) = (c_lines_v - 370) else    -- change 360 with the position
-                            "000";
-
-    -----------------------------------------------------------------------------------------------
-    -- PIXEL OUT SUPERPOSITION 
-    -----------------------------------------------------------------------------------------------
-    s_pixel_out <= s_pixel_grid(2 downto 0) or 
-                   s_pixel_border(2 downto 0) or 
-                   s_pixel_ch1_offset(2 downto 0) or
-                   s_pixel_ch2_offset(2 downto 0) or 
-                   s_pixel_trigger_pos(2 downto 0) or
-                   s_pixel_trigger_ampl(2 downto 0);
-
-   
 
 end platform_independent;
 
