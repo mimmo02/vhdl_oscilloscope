@@ -58,42 +58,94 @@ architecture platform_independent of dso_module is
     signal s_HDMI_CLOCK : std_logic;
     signal s_ACTIVE_VIDEO : std_logic;
 
+    signal myLevel1 : std_logic_vector(9 downto 0) := "0000000000";
+    signal myLevel2 : std_logic_vector(9 downto 0) := "0000000000";
 
 begin
 
     -- implement your system here
 
-    DISPLAY : entity work.display_module(platform_independent)
-        port map(
-            clk_148_5_MHz       => clk_148_5_MHz,
-            reset               => reset,
+    -- DISPLAY : entity work.display_module(platform_independent)
+    --     port map(
+    --         clk_148_5_MHz       => clk_148_5_MHz,
+    --         reset               => reset,
         
-            ChannelOneOn        => '0',
-            ChannelTwoOn        => '0',
-            ChannelOneDot       => '0',
-            ChannelTwoDot       => '0', 
-            ChannelOneSample    => "0000000000",
-            ChannelTwoSample    => "0000000000",
-            ChannelOneOffset    => "0000000000",
-            ChannelTwoOffset    => "0000000000",
-            TriggerLevel        => "0000000000",
-            TriggerPoint        => "00000000000",
-            TriggerChannelOne   => '0',
+    --         ChannelOneOn        => '1',
+    --         ChannelTwoOn        => '1',
+    --         ChannelOneDot       => '0',
+    --         ChannelTwoDot       => '0', 
+    --         ChannelOneSample    => "1010111100",    -- 700
+    --         ChannelTwoSample    => "1010111100",    -- 700
+    --         ChannelOneOffset    => "0000101101",    -- 45
+    --         ChannelTwoOffset    => "0010000111",    -- 135
+    --         TriggerLevel        => "0101101010",    -- 360
+    --         TriggerPoint        => "00111110100",    -- 500
+    --         TriggerChannelOne   => '1',
 
-            RequestSample       => open,
-            NextLine            => open,
-            NextScreen          => open,
+    --         RequestSample       => open,
+    --         NextLine            => open,
+    --         NextScreen          => open,
 
-            HSYNC               => s_HSYNC,                        -- Horizontal synchronization signal
-            VSYNC               => s_VSYNC,                        -- Vertical synchronization signal
-            RED                 => s_RED,                          -- Red color channel
-            GREEN               => s_GREEN,                        -- Green color channel
-            BLUE                => s_BLUE,                         -- Blue color channel
-            HDMI_CLOCK          => s_HDMI_CLOCK,                   -- Clock signal for the HDMI interface
-            ACTIVE_VIDEO        => s_ACTIVE_VIDEO                  -- Active video signal for the HDMI interface
+    --         HSYNC               => s_HSYNC,                        -- Horizontal synchronization signal
+    --         VSYNC               => s_VSYNC,                        -- Vertical synchronization signal
+    --         RED                 => s_RED,                          -- Red color channel
+    --         GREEN               => s_GREEN,                        -- Green color channel
+    --         BLUE                => s_BLUE,                         -- Blue color channel
+    --         HDMI_CLOCK          => s_HDMI_CLOCK,                   -- Clock signal for the HDMI interface
+    --         ACTIVE_VIDEO        => s_ACTIVE_VIDEO                  -- Active video signal for the HDMI interface
 
 
+    --     );
+
+        -- ONDA : process(clk_148_5_MHz)
+        --     variable level : integer := 0;
+        -- begin
+        --     if rising_edge(clk_148_5_MHz) then
+        --         if level = 128 then
+        --             level := 0;
+        --         else
+        --             level := level + 1;
+        --         end if;
+        --         myLevel1 <= std_logic_vector(to_unsigned(level + 200, 10));
+        --         myLevel2 <= std_logic_vector(to_unsigned(level + 400, 10));
+        --     end if;
+            
+        -- end process ONDA;
+
+        -- ONDA2 : process(clk_148_5_MHz)
+        --     variable count : integer := 1;
+        -- begin
+        --     if rising_edge(clk_148_5_MHz) then
+        --         if count <= 64 then
+        --             count := count + 1;
+        --             myLevel1 <= std_logic_vector(to_unsigned(500, 10));
+        --             myLevel2 <= std_logic_vector(to_unsigned(400, 10));
+        --         elsif count <= 127 then
+        --             count := count + 1;
+        --             myLevel1 <= std_logic_vector(to_unsigned(300, 10));
+        --             myLevel2 <= std_logic_vector(to_unsigned(100, 10));
+        --         else
+        --             count := 1;
+        --         end if;
+                
+        --     end if;
+            
+        -- end process ONDA2;
+
+    TEST : entity work.test_screen(platform_independant)
+        port map (
+            clk_148_5_MHz => clk_148_5_MHz,
+            reset         => reset,
+
+            HSYNC         => s_HSYNC,
+            VSYNC         => s_VSYNC,
+            RED           => s_RED,
+            GREEN         => s_GREEN,
+            BLUE          => s_BLUE,
+            HDMI_CLOCK    => s_HDMI_CLOCK,
+            ACTIVE_VIDEO  => s_ACTIVE_VIDEO
         );
+
 
         HSYNC <= s_HSYNC;
         VSYNC <= s_VSYNC;
