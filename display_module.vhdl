@@ -171,34 +171,6 @@ begin
         end if;
     end process SAMPLE_PRE;
 
-
-    -- CH1 : process(ChannelOneSample, s_index_v, s_index_h, ChannelOneOn, ChannelOneDot)
-    -- variable v_index_v : unsigned(9 downto 0);
-    -- begin
-    --     v_index_v := c_lines_v - unsigned(s_index_v) + 1;
-    --     s_ch1 <= '0';
-    --     if s_ACTIVE_VIDEO = '1' then
-    --         if ChannelOneOn = '1' then                                     -- channel 1 is active
-    --             if ChannelOneDot = '1' then
-    --                 if v_index_v = unsigned(ChannelOneSample) then         -- display sample dot
-    --                     s_ch1 <= '1';
-    --                 end if;
-    --             elsif ChannelOneDot = '0' then                             -- display vertical line
-    --                 if unsigned(ChannelOneSample) >= unsigned(s_ch1_sample_pre) then  -- sample is higher than before
-    --                     if v_index_v >= unsigned(s_ch1_sample_pre) and v_index_v <= unsigned(ChannelOneSample) then  
-    --                         s_ch1 <= '1';
-    --                     end if;
-    --                 elsif unsigned(ChannelOneSample) <= unsigned(s_ch1_sample_pre) then  -- sample is lower than before                      
-    --                     if v_index_v <= unsigned(s_ch1_sample_pre) and v_index_v >= unsigned(ChannelOneSample) then
-    --                         s_ch1 <= '1';                                  
-    --                     end if;
-    --                 end if;
-    --             end if;
-    --         end if;
-    --     end if;
-    -- end process CH1;
-
-
     s_ch1_dot <= '1' when (c_lines_v - unsigned(s_index_v)) = unsigned(ChannelOneSample) else
                  '0';
 
@@ -228,34 +200,6 @@ begin
     s_ch2 <= s_ch2_dot or s_ch2_vert when ChannelTwoOn = '1' and ChannelTwoDot = '0' else
              s_ch2_dot               when ChannelTwoOn = '1' and ChannelTwoDot = '1' else
              '0';
-
-    -- CH2 : process(ChannelTwoSample, s_index_v, s_index_h, ChannelTwoOn, ChannelTwoDot)
-    -- variable v_index_v : unsigned(9 downto 0);
-    -- begin
-    --     v_index_v := c_lines_v - unsigned(s_index_v) + 1;
-    --     s_ch2 <= '0';
-    --     if s_ACTIVE_VIDEO = '1' then
-    --         if ChannelTwoOn = '1' then                                     -- channel 1 is active
-    --             if ChannelTwoDot = '1' then
-    --                 if v_index_v = unsigned(ChannelTwoSample) then         -- display sample dot
-    --                     s_ch2 <= '1';
-    --                 end if;
-    --             elsif ChannelTwoDot = '0' then                             -- display vertical line
-    --                 if unsigned(ChannelTwoSample) >= unsigned(s_ch2_sample_pre) then  -- sample is higher than before
-    --                     if v_index_v >= unsigned(s_ch2_sample_pre) and v_index_v <= unsigned(ChannelTwoSample) then  
-    --                         s_ch2 <= '1';
-    --                     end if;
-    --                 elsif unsigned(ChannelTwoSample) <= unsigned(s_ch2_sample_pre) then  -- sample is lower than before                      
-    --                     if v_index_v <= unsigned(s_ch2_sample_pre) and v_index_v >= unsigned(ChannelTwoSample) then
-    --                         s_ch2 <= '1';                                  
-    --                     end if;
-    --                 end if;
-    --             end if;
-    --         end if;
-    --     end if;
-    -- end process CH2;
-    
-
 
     -----------------------------------------------------------------------------------------------
     -- PIXEL OUT SUPERPOSITION 
