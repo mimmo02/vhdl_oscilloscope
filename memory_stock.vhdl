@@ -14,16 +14,17 @@ use ieee.numeric_std.all;
 
 entity memory_stock is
     generic (
-            NDATA : integer := 9     -- number of data bits
+            NDATA : integer := 9;    -- number of data bits
             NADDR : integer := 13    -- number of address bits (8192 memory cells)
-    );
-    port (  clk             : in std_logic;
-            we              : in std_logic;
-            re              : in std_logic;
-            addr            : in std_logic_vector(NADDR-1 downto 0);
-            din             : in std_logic_vector(NDATA-1 downto 0);
-            dout            : out std_logic_vector(NDATA-1 downto 0);
             );
+    port (  
+        clk             : in std_logic;                             -- clock signal
+        we              : in std_logic;                             -- write enable signal (active high)
+        re              : in std_logic;                             -- read enable signal (active high)
+        addr            : in std_logic_vector(NADDR-1 downto 0);    -- address bus  
+        din             : in std_logic_vector(NDATA-1 downto 0);    -- data input
+        dout            : out std_logic_vector(NDATA-1 downto 0)    -- data output
+        );
 end entity memory_stock;
 
 architecture dual_port of memory_stock is
