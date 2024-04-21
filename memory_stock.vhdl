@@ -33,7 +33,6 @@ architecture dual_port of memory_stock is
         of std_logic_vector(NDATA-1 downto 0);
 
     signal ram : ram_type;
-    signal data_buf : std_logic_vector(NDATA-1 downto 0);
 
 begin
 
@@ -41,14 +40,12 @@ begin
     begin
         
         if rising_edge(clk) then
-            data_buf <= (others => '0');
             if we = '1' then                -- write operation
                 ram(to_integer(unsigned(addr))) <= din;
             end if;
             if re = '1' then                -- read operation
-                data_buf <= ram(to_integer(unsigned(addr)));
+                dout <= ram(to_integer(unsigned(addr)));
             end if;
-            dout <= data_buf;
         end if;
 
     end process;
