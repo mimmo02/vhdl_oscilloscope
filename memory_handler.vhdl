@@ -18,119 +18,135 @@ entity memory_handler is
         clk                 : in std_logic;                           -- clock signal
         rst                 : in std_logic;                           -- reset signal
 
-        start               : in std_logic;                           -- start signal
+        -- trigger
+        Trigger_ref         : in std_logic_vector(8 downto 0);        -- trigger level signal
+        Trigger_pos         : in std_logic_vector(10 downto 0);       -- trigger position (from 0 to 1280 - middle at 640)
+        Trigger_ch1         : in std_logic;                           -- trigger channel signal
+        Trigger_on_rising   : in std_logic;                           -- trigger on rising edge
+        TimeBase            : in unsigned(2 downto 0);                -- time base signal (1 to 6 samples per pixel)
 
-        trigger_ref         : in std_logic_vector(8 downto 0);        -- trigger level signal
-        trigger_ch1         : in std_logic;                           -- trigger channel signal
-        trigger_on_rising   : in std_logic;                          -- trigger on rising edge
-
+        -- ADC
         sample_in_ch1       : in std_logic_vector(8 downto 0);        -- sample signal channel 1
         sample_in_ch2       : in std_logic_vector(8 downto 0);        -- sample signal channel 2
         valid_in            : in std_logic;                           -- valid sample 
 
-        write_cmd           : out std_logic;                          -- write command signal
-        address_cmd         : out std_logic_vector(12 downto 0);      -- address command signal
-        sample_out_ch1      : out std_logic_vector(8 downto 0);       -- sample signal channel 1
-        sample_out_ch2      : out std_logic_vector(8 downto 0);       -- sample signal channel 2
+        -- display
+        RequestSample       : in std_logic;                           -- request sample signal from display
+        NextLine            : in std_logic;                           -- next line signal from display
+        NextScreen          : in std_logic;                           -- next screen signal from display
 
-        filled              : out std_logic                           -- memory filled signal
+        Offset_ch1          : in std_logic_vector(9 downto 0);        -- offset channel 1 signal
+        Offset_ch2          : in std_logic_vector(9 downto 0);        -- offset channel 2 signal
+        Sig_amplitude       : in std_logic_vector(2 downto 0);        -- define amplitude of visualization signal
+        
+        ChannelOneSample    : out std_logic_vector(9 downto 0);       -- channel 1 sample signal
+        ChannelTwoSample    : out std_logic_vector(9 downto 0)        -- channel 2 sample signal
+        
+
         );
 end entity memory_handler;
 
 architecture platform_indipendent of memory_handler is
 
-    constant sample_number : integer := 8192; -- number of samples
+    constant c_sample_number : integer := 8192; -- number of samples to fill memory
+    constant c_pixels_number : integer := 1280; -- number of sample to display
 
-    type state_type is (STOP, WAIT_PRE_TRIGGER,PRE_TRIGGER, POST_TRIGGER, END_FILL);
-    signal state      : state_type := STOP;
-    signal state_next : state_type := STOP;
+    type state_type is (WAIT_PRE_TRIGGER,PRE_TRIGGER, POST_TRIGGER, END_FILL, SWAP);
+    signal state      : state_type := WAIT_PRE_TRIGGER;
+    signal state_next : state_type := WAIT_PRE_TRIGGER;
 
-    signal start_event      : std_logic := '0';
-    signal valid_event      : std_logic := '0';
-    signal trigger_event    : std_logic := '0';
-    signal end_event        : std_logic := '0';
+    signal s_event_valid      : std_logic := '0';     -- allow trigger detection event 
+    signal s_event_trigger    : std_logic := '0';     -- trigger event
+    signal s_event_end        : std_logic := '0';     -- end of samples store event
+    signal s_event_swap        : std_logic := '0';    -- swap memory event
 
-    signal counter : unsigned(12 downto 0) := (others => '0');
-    signal trigger_address  : unsigned(12 downto 0) := (others => '0');
+    signal s_write_counter   : unsigned(12 downto 0) := (others => '0');
+    signal s_read_counter    : unsigned(12 downto 0) := (others => '0');
+    signal s_trigger_address : unsigned(12 downto 0) := (others => '0');
+    signal s_pixel_step      : unsigned(2 downto 0);
 
-    signal sample_in_ch1_pre : std_logic_vector(8 downto 0) := (others => '0');
-    signal sample_in_ch2_pre : std_logic_vector(8 downto 0) := (others => '0');
+    signal s_sample_in_ch1_pre : std_logic_vector(8 downto 0) := (others => '0');
+    signal s_sample_in_ch2_pre : std_logic_vector(8 downto 0) := (others => '0');
+
+    signal s_sample_ch1_out  : std_logic_vector(8 downto 0);
+    signal s_sample_ch2_out  : std_logic_vector(8 downto 0);
+    signal s_ChannelOneSample : unsigned(9 downto 0);
+    signal s_ChannelTwoSample : unsigned(9 downto 0);
+    signal s_write_address   : unsigned(12 downto 0);
+    signal s_read_address    : unsigned(12 downto 0);
+
+    signal s_ram_select : std_logic := '0';
+    signal s_write_ram0 : std_logic := '0';
+    signal s_read_ram0  : std_logic := '0';
+    signal s_write_ram1 : std_logic := '0';
+    signal s_read_ram1  : std_logic := '0';
+    signal s_write_ram2 : std_logic := '0';
+    signal s_read_ram2  : std_logic := '0';
+    signal s_write_ram3 : std_logic := '0';
+    signal s_read_ram3  : std_logic := '0';
+    signal s_ram0_address : std_logic_vector(12 downto 0) := (others => '0');
+    signal s_ram1_address : std_logic_vector(12 downto 0) := (others => '0');
+    signal s_ram2_address : std_logic_vector(12 downto 0) := (others => '0');
+    signal s_ram3_address : std_logic_vector(12 downto 0) := (others => '0');
 
 begin
 
-    -- generate the start event for the state machine
-    start_event <= '1' when start = '1' else 
-                   '0';
+    -----------------------------------------------------------------------------------------------
+    -- FSM
+    -----------------------------------------------------------------------------------------------
 
     -- compute the state of the state machine
     REG: process(clk, rst) is
     begin
         if rst = '1' then
-            state <= STOP;
+            state <= WAIT_PRE_TRIGGER;
         elsif rising_edge(clk) then
             state <= state_next;
         end if;
     end process REG;
 
     -- compute the next state of the state machine
-    NSL : process(start_event,valid_event,trigger_event,end_event,state,clk) is
+    NSL : process(s_event_valid,s_event_trigger,s_event_end,s_event_swap,state) is
     begin
         state_next <= state;
-        switch(state) is
-            when STOP =>
-                if start_event = '1' then
-                    state_next <= WAIT_PRE_TRIGGER;
-                end if;
+        case(state) is
             when WAIT_PRE_TRIGGER =>
-                if valid_event = '1' then
+                if s_event_valid = '1' then
                     state_next <= PRE_TRIGGER;
                 end if;
             when PRE_TRIGGER =>
-                if trigger_event = '1' then
+                if s_event_trigger = '1' then
                     state_next <= POST_TRIGGER;
                 end if;
             when POST_TRIGGER =>
-                if end_event = '1' then
+                if s_event_end = '1' then
                     state_next <= END_FILL;
                 end if;
             when END_FILL =>
-                next_state <= STOP; 
-        end switch;
-    end process NSL;
-
-    filled <= '1' when state = END_FILL else
-              '0';
-
-    -- counter for the adrress generation
-    COUNTER : process(valid_in,rst,state) is
-    begin
-        if rst = '1' then
-            counter <= (others => '0');
-        elsif valid_in = '1' then
-            if state = WAIT_PRE_TRIGGER or state = PRE_TRIGGER or state = POST_TRIGGER then
-                if counter < sample_number then
-                    counter <= counter + 1;
-                else
-                    counter <= (others => '0');
+                if s_event_swap = '1' then
+                    state_next <= SWAP;
                 end if;
-            else 
-                counter <= (others => '0');
-            end if;
-        end if;
-    end process COUNTER;    
+            when SWAP =>
+                state_next <= WAIT_PRE_TRIGGER;
+        end case;
+    end process NSL;   
+
+    -----------------------------------------------------------------------------------------------
+    -- FSM EVENTS GENERATION
+    -----------------------------------------------------------------------------------------------
 
     -- generate the valid event for the state machine
     -- wait half memory to be filled before generating the valid event
-    VALID : process(counter) is
+    VALID : process(s_write_counter) is
     begin
         if state = WAIT_PRE_TRIGGER then
-            if counter = sample_number/2 then
-                valid_event <= '1';
+            if s_write_counter = c_sample_number/2 then
+                s_event_valid <= '1';
             else
-                valid_event <= '0';
+                s_event_valid <= '0';
             end if;
         else 
-            valid_event <= '0';
+            s_event_valid <= '0';
         end if;
     end process VALID;
 
@@ -139,85 +155,256 @@ begin
     begin
         if state = PRE_TRIGGER then                         -- detect trigger event only in the pre-trigger state
             if valid_in = '1' then
-                if address > sample_number/2 then           -- consider trigger event only if it appens im the secon half of samples
-                    if trigger_ch1 = '1' then               -- trigger on channel 1
-                        if trigger_on_rising = '1' then     -- trigger on rising edge
-                            if sample_in_ch1_pre < trigger_ref and sample_in_ch1 >= trigger_ref then
-                                trigger_event <= '1';
+                if s_write_counter > c_sample_number/2 then           -- consider trigger event only if it appens im the secon half of samples
+                    if Trigger_ch1 = '1' then               -- trigger on channel 1
+                        if Trigger_on_rising = '1' then     -- trigger on rising edge
+                            if s_sample_in_ch1_pre < Trigger_ref and sample_in_ch1 >= Trigger_ref then
+                                s_event_trigger <= '1';
                             else 
-                                trigger_event <= '0';
+                                s_event_trigger <= '0';
                             end if;
                         else                                -- trigger on falling edge  
-                            if sample_in_ch1_pre > trigger_ref and sample_in_ch1 <= trigger_ref then
-                                trigger_event <= '1';
+                            if s_sample_in_ch1_pre > Trigger_ref and sample_in_ch1 <= Trigger_ref then
+                                s_event_trigger <= '1';
                             else 
-                                trigger_event <= '0';
+                                s_event_trigger <= '0';
                             end if;
                         end if;
                     else                                    -- trigger on channel 2
-                        if trigger_on_rising = '1' then     -- trigger on rising edge
-                            if sample_in_ch2_pre < trigger_ref and sample_in_ch2 >= trigger_ref then
-                                trigger_event <= '1';
+                        if Trigger_on_rising = '1' then     -- trigger on rising edge
+                            if s_sample_in_ch2_pre < Trigger_ref and sample_in_ch2 >= Trigger_ref then
+                                s_event_trigger <= '1';
                             else 
-                                trigger_event <= '0';
+                                s_event_trigger <= '0';
                             end if;
                         else                                -- trigger on falling edge  
-                            if sample_in_ch2_pre > trigger_ref and sample_in_ch2 <= trigger_ref then
-                                trigger_event <= '1';
+                            if s_sample_in_ch2_pre > Trigger_ref and sample_in_ch2 <= Trigger_ref then
+                                s_event_trigger <= '1';
                             else 
-                                trigger_event <= '0';
+                                s_event_trigger <= '0';
                             end if;
                         end if;
                     end if;
                 end if;
             end if;
         else
-            trigger_event <= '0';
+            s_event_trigger <= '0';
         end if;
-        sample_in_ch1_pre <= sample_in_ch1;             -- store the previous sample ch1
-        sample_in_ch2_pre <= sample_in_ch2;             -- store the previous sample ch2
+        s_sample_in_ch1_pre <= sample_in_ch1;             -- store the previous sample ch1
+        s_sample_in_ch2_pre <= sample_in_ch2;             -- store the previous sample ch2
     end process TRIGGER;
 
-    trigger_address <= counter when trigger_event = '1';  -- store the trigger address
+    -- store the trigger address
+    TRIGGER_ADDRESS : process(s_event_trigger,s_write_counter) is 
+    begin
+        s_trigger_address <= s_trigger_address;
+        if s_event_trigger = '1' then
+            s_trigger_address <= s_write_counter;                 -- store the trigger address
+        end if;
+    end process TRIGGER_ADDRESS;    
 
     -- generate the end event for the state machine
-    END_EVENT : process(counter) is
+    FILL_END : process(s_write_counter) is
     begin
         if state = POST_TRIGGER then
-            if trigger_address < sample_number/2 then   -- trigger event is in first half of samples
-                if counter = (trigger_address + sample_number/2) then
-                    end_event <= '1';
+            if s_trigger_address < c_sample_number/2 then   -- trigger event is in first half of samples
+                if s_write_counter = (s_trigger_address + c_sample_number/2) then
+                    s_event_end <= '1';
                 else
-                    end_event <= '0';
+                    s_event_end <= '0';
                 end if;
             else                                        -- trigger event is in second half of samples
-                if counter = (trigger_address - sample_number/2) then
-                    end_event <= '1';
+                if s_write_counter = (s_trigger_address - c_sample_number/2) then
+                    s_event_end <= '1';
                 else
-                    end_event <= '0';
+                    s_event_end <= '0';
+                end if;
             end if;
         else
-            end_event <= '0';
+            s_event_end <= '0';
         end if;
-    end process END_EVENT;
+    end process FILL_END;
 
-   -- memory filler
-   MEMORY_FILLER : process(valid_in) is
-   begin
-       if valid_in = '0' then
-           if state = PRE_TRIGGER or state = POST_TRIGGER then
-               write_cmd <= '1';
-               address_cmd <= std_logic_vector(counter);
-               sample_out_ch1 <= sample_in_ch1;
-               sample_out_ch2 <= sample_in_ch2;
-           else
-               write_cmd <= '0';
-               address_cmd <= (others => '0');
-               sample_out_ch1 <= (others => '0');
-               sample_out_ch2 <= (others => '0');
-           end if;
-       end if;        
-   end process MEMORY_FILLER;
+    -- generate the swap event for the state machine
+    MEMORY_SWAP : process(NextScreen) is
+    begin
+        if state = END_FILL then 
+            if NextScreen = '1' then    -- swap memory when the display request a new screen
+                s_event_swap <= '1';
+            else
+                s_event_swap <= '0';
+            end if;
+        end if;
+    end process MEMORY_SWAP;
 
+    -----------------------------------------------------------------------------------------------
+    -- COUNTERS FOR ADDRESS GENERATION
+    -----------------------------------------------------------------------------------------------
+
+    -- counter for the write in RAM adrress generation 
+    WRITE_COUNTER : process(valid_in,rst,state) is
+    begin
+        if rst = '1' then
+            s_write_counter <= (others => '0');
+        elsif valid_in = '1' then
+            if state = WAIT_PRE_TRIGGER or state = PRE_TRIGGER or state = POST_TRIGGER then
+                s_write_counter <= s_write_counter + 1;
+            else 
+                s_write_counter <= (others => '0');
+            end if;
+        end if;
+    end process WRITE_COUNTER; 
+
+    -- counter for the read from RAM adrress generation
+    READ_COUNTER : process(RequestSample,NextLine,rst,state) is
+    begin
+        if rst = '1' or NextLine = '1' or state = SWAP then 
+            s_read_counter <= (others => '0');
+        elsif RequestSample = '1' and state /= SWAP then
+            s_read_counter <= s_read_counter + 1;
+        end if;
+    end process READ_COUNTER;
+    
+    -----------------------------------------------------------------------------------------------
+    -- RAM
+    -----------------------------------------------------------------------------------------------
+
+    s_ram_select <= not s_ram_select when state = SWAP else   -- swap memory
+                    s_ram_select; 
+
+    -- READ ENABLE --------------------------------------------------------------------------------
+
+    -- ram0 read enable
+    s_read_ram0 <= '1' when state /= SWAP and RequestSample = '1' and s_ram_select = '0' else 
+                   '0';
+    -- ram1 read enable
+    s_read_ram1 <= '1' when state /= SWAP and RequestSample = '1' and s_ram_select = '1' else 
+                   '0';
+    -- ram2 read enable
+    s_read_ram2 <= '1' when state /= SWAP and RequestSample = '1' and s_ram_select = '0' else 
+                   '0';
+    -- ram3 read enable
+    s_read_ram3 <= '1' when state /= SWAP and RequestSample = '1' and s_ram_select = '1' else 
+                   '0';
+
+    -- WRITE ENABLE --------------------------------------------------------------------------------
+
+    -- ram0 write enable
+    s_write_ram0 <= '1' when (state = PRE_TRIGGER or state = POST_TRIGGER) and valid_in = '1' and s_ram_select = '1' else 
+                    '0';
+    -- ram1 write enable
+    s_write_ram1 <= '1' when (state = PRE_TRIGGER or state = POST_TRIGGER) and valid_in = '1' and s_ram_select = '0' else 
+                    '0';
+    -- ram2 write enable
+    s_write_ram2 <= '1' when (state = PRE_TRIGGER or state = POST_TRIGGER) and valid_in = '1' and s_ram_select = '1' else 
+                    '0';
+    -- ram3 write enable
+    s_write_ram3 <= '1' when (state = PRE_TRIGGER or state = POST_TRIGGER) and valid_in = '1' and s_ram_select = '0' else 
+                    '0';
+
+    -- set pixels step (number of samples per pixel)
+    s_pixel_step <= "001" when TimeBase = "000" else      -- 1 sample per pixel
+                    "010" when TimeBase = "001" else      -- 2 samples per pixel
+                    "011" when TimeBase = "010" else      -- 3 samples per pixel
+                    "100" when TimeBase = "011" else      -- 4 samples per pixel  
+                    "101" when TimeBase = "100" else      -- 5 samples per pixel
+                    "110" when TimeBase = "101" else      -- 6 samples per pixel  
+                    "001";                                -- default 1 sample per pixel
+
+    -- ADDRESSES COMPUTATION ------------------------------------------------------------------------
+
+    s_write_address <= s_write_counter;
+
+    
+    s_read_address <= resize(s_trigger_address - (s_pixel_step * (c_pixels_number/2)) + (s_read_counter * s_pixel_step) - ((c_pixels_number/2) + unsigned(Trigger_pos)),13);
+
+
+    -- ram0 address
+    s_ram0_address <= std_logic_vector(s_write_address) when (state = WAIT_PRE_TRIGGER or state = PRE_TRIGGER or state = POST_TRIGGER) and s_ram_select = '1' else                  
+                      std_logic_vector(s_read_address)  when state /= SWAP and s_ram_select = '0' else
+                      (others => '0');
+
+    -- ram1 address
+    s_ram1_address <= std_logic_vector(s_write_address) when (state = WAIT_PRE_TRIGGER or state = PRE_TRIGGER or state = POST_TRIGGER) and s_ram_select = '0' else                  
+                      std_logic_vector(s_read_address)  when state /= SWAP and s_ram_select = '1' else
+                      (others => '0');
+
+    -- ram2 address
+    s_ram2_address <= std_logic_vector(s_write_address) when (state = WAIT_PRE_TRIGGER or state = PRE_TRIGGER or state = POST_TRIGGER) and s_ram_select = '1' else                  
+                      std_logic_vector(s_read_address)  when state /= SWAP and s_ram_select = '0' else
+                      (others => '0');
+
+    -- ram3 address
+    s_ram3_address <= std_logic_vector(s_write_address) when (state = WAIT_PRE_TRIGGER or state = PRE_TRIGGER or state = POST_TRIGGER) and s_ram_select = '0' else                  
+                      std_logic_vector(s_read_address)  when state /= SWAP and s_ram_select = '1' else
+                      (others => '0');
+
+    -- OUTPUT SAMPLE COMPUTATION ---------------------------------------------------------------------
+
+    -- Sig_amplitude: 000: 1/4, 001: 1/2, 010: 1, 011: 2, 100: 4
+
+    s_ChannelOneSample <= unsigned(s_sample_ch1_out sll 2) + unsigned(Offset_ch1) when Sig_amplitude = "000" and state /= SWAP else
+                          unsigned(s_sample_ch1_out sll 1) + unsigned(Offset_ch1) when Sig_amplitude = "001" and state /= SWAP else
+                          unsigned(s_sample_ch1_out srl 1) + unsigned(Offset_ch1) when Sig_amplitude = "011" and state /= SWAP else
+                          unsigned(s_sample_ch1_out srl 2) + unsigned(Offset_ch1) when Sig_amplitude = "100" and state /= SWAP else
+                          unsigned(s_sample_ch1_out) + unsigned(Offset_ch1) when Sig_amplitude = "010" and state /= SWAP else
+                          (others => '0');
+
+    s_ChannelTwoSample <= unsigned(s_sample_ch2_out sll 2) + unsigned(Offset_ch2) when Sig_amplitude = "000" and state /= SWAP else
+                          unsigned(s_sample_ch2_out sll 1) + unsigned(Offset_ch2) when Sig_amplitude = "001" and state /= SWAP else
+                          unsigned(s_sample_ch2_out srl 1) + unsigned(Offset_ch2) when Sig_amplitude = "011" and state /= SWAP else
+                          unsigned(s_sample_ch2_out srl 2) + unsigned(Offset_ch2) when Sig_amplitude = "100" and state /= SWAP else
+                          unsigned(s_sample_ch2_out) + unsigned(Offset_ch2) when Sig_amplitude = "010" and state /= SWAP else
+                          (others => '0');
+
+    ChannelOneSample <= std_logic_vector(s_ChannelOneSample);
+    ChannelTwoSample <= std_logic_vector(s_ChannelTwoSample);
+
+    -- RAM INSTANTIATION -----------------------------------------------------------------------------
+
+    -- samples ch1 first buffer
+    RAM0 : entity work.memory_stock(dual_port) 
+        port map (
+            clk => clk,
+            we => s_write_ram0,
+            re => s_read_ram0,
+            addr => std_logic_vector(s_write_counter),
+            din => sample_in_ch1,
+            dout => s_sample_ch1_out
+        );
+
+    -- samples ch1 second buffer
+    RAM1 : entity work.memory_stock(dual_port) 
+        port map (
+            clk => clk,
+            we => s_write_ram1,
+            re => s_read_ram1,
+            addr => std_logic_vector(s_write_counter),
+            din => sample_in_ch1,
+            dout => s_sample_ch1_out
+        );
+
+    -- samples ch2 first buffer
+    RAM2 : entity work.memory_stock(dual_port) 
+        port map (
+            clk => clk,
+            we => s_write_ram2,
+            re => s_read_ram2,
+            addr => std_logic_vector(s_write_counter),
+            din => sample_in_ch2,
+            dout => s_sample_ch2_out
+        );
+
+    -- samples ch2 second buffer
+    RAM3 : entity work.memory_stock(dual_port) 
+        port map (
+            clk => clk,
+            we => s_write_ram3,
+            re => s_read_ram3,
+            addr => std_logic_vector(s_write_counter),
+            din => sample_in_ch2,
+            dout => s_sample_ch2_out
+        );
+   
 end architecture platform_indipendent;
 
