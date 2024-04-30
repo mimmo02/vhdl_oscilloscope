@@ -186,12 +186,12 @@ begin
                         end if;
                     end if;
                 end if;
+                s_sample_in_ch1_pre <= sample_in_ch1;             -- store the previous sample ch1
+                s_sample_in_ch2_pre <= sample_in_ch2;             -- store the previous sample ch2
             end if;
         else
             s_event_trigger <= '0';
         end if;
-        s_sample_in_ch1_pre <= sample_in_ch1;             -- store the previous sample ch1
-        s_sample_in_ch2_pre <= sample_in_ch2;             -- store the previous sample ch2
     end process TRIGGER;
 
     -- store the trigger address
