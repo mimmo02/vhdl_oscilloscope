@@ -19,8 +19,8 @@ entity memory_handler is
         rst                 : in std_logic;                           -- reset signal
 
         -- trigger
-        Trigger_ref         : in std_logic_vector(8 downto 0);        -- trigger level signal
-        Trigger_pos         : in std_logic_vector(10 downto 0);       -- trigger position (from 0 to 1280 - middle at 640)
+        Trigger_ref         : in std_logic_vector(5 downto 0);        -- trigger level signal (from 1 to 44 - middle at 22) [step 16]
+        Trigger_pos         : in std_logic_vector(5 downto 0);        -- trigger position (from 1 to 39 - middle at 20)     [step 32]
         Trigger_ch1         : in std_logic;                           -- trigger channel signal
         Trigger_on_rising   : in std_logic;                           -- trigger on rising edge
         TimeBase            : in unsigned(2 downto 0);                -- time base signal (1 to 6 samples per pixel)
@@ -35,14 +35,14 @@ entity memory_handler is
         NextLine            : in std_logic;                           -- next line signal from display
         NextScreen          : in std_logic;                           -- next screen signal from display
 
-        Offset_ch1          : in std_logic_vector(9 downto 0);        -- offset channel 1 signal
-        Offset_ch2          : in std_logic_vector(9 downto 0);        -- offset channel 2 signal
-        Sig_amplitude       : in std_logic_vector(2 downto 0);        -- define amplitude of visualization signal
+        Offset_ch1          : in std_logic_vector(5 downto 0);        -- offset channel 1 signal [step: 16]
+        Offset_ch2          : in std_logic_vector(5 downto 0);        -- offset channel 2 signal [step: 16]
+        Sig_amplitude_ch1   : in std_logic_vector(2 downto 0);        -- define amplitude of visualization signal
+        Sig_amplitude_ch2   : in std_logic_vector(2 downto 0);        -- define amplitude of visualization signal
         
         ChannelOneSample    : out std_logic_vector(9 downto 0);       -- channel 1 sample signal
         ChannelTwoSample    : out std_logic_vector(9 downto 0)        -- channel 2 sample signal
         
-
         );
 end entity memory_handler;
 
@@ -158,13 +158,13 @@ begin
                 if s_write_counter > c_sample_number/2 then           -- consider trigger event only if it appens im the secon half of samples
                     if Trigger_ch1 = '1' then               -- trigger on channel 1
                         if Trigger_on_rising = '1' then     -- trigger on rising edge
-                            if s_sample_in_ch1_pre < Trigger_ref and sample_in_ch1 >= Trigger_ref then
+                            if unsigned(s_sample_in_ch1_pre) < (unsigned(Trigger_ref)*16) and unsigned(sample_in_ch1) >= (unsigned(Trigger_ref)*16) then
                                 s_event_trigger <= '1';
                             else 
                                 s_event_trigger <= '0';
                             end if;
                         else                                -- trigger on falling edge  
-                            if s_sample_in_ch1_pre > Trigger_ref and sample_in_ch1 <= Trigger_ref then
+                            if unsigned(s_sample_in_ch1_pre) > (unsigned(Trigger_ref)*16) and unsigned(sample_in_ch1) <= (unsigned(Trigger_ref)*16) then
                                 s_event_trigger <= '1';
                             else 
                                 s_event_trigger <= '0';
@@ -172,13 +172,13 @@ begin
                         end if;
                     else                                    -- trigger on channel 2
                         if Trigger_on_rising = '1' then     -- trigger on rising edge
-                            if s_sample_in_ch2_pre < Trigger_ref and sample_in_ch2 >= Trigger_ref then
+                            if unsigned(s_sample_in_ch2_pre) < (unsigned(Trigger_ref)*16) and unsigned(sample_in_ch2) >= (unsigned(Trigger_ref)*16) then
                                 s_event_trigger <= '1';
                             else 
                                 s_event_trigger <= '0';
                             end if;
                         else                                -- trigger on falling edge  
-                            if s_sample_in_ch2_pre > Trigger_ref and sample_in_ch2 <= Trigger_ref then
+                            if unsigned(s_sample_in_ch2_pre) > (unsigned(Trigger_ref)*16) and unsigned(sample_in_ch2) <= (unsigned(Trigger_ref)*16) then
                                 s_event_trigger <= '1';
                             else 
                                 s_event_trigger <= '0';
@@ -315,8 +315,8 @@ begin
 
     s_write_address <= s_write_counter;
 
-    
-    s_read_address <= resize(s_trigger_address - (s_pixel_step * (c_pixels_number/2)) + (s_read_counter * s_pixel_step) - ((c_pixels_number/2) + unsigned(Trigger_pos)),13);
+
+    s_read_address <= resize(s_trigger_address - (s_pixel_step * (c_pixels_number/2)) + (s_read_counter * s_pixel_step) - ((c_pixels_number/2) + (unsigned(Trigger_pos)*32)),13);
 
 
     -- ram0 address
@@ -343,18 +343,18 @@ begin
 
     -- Sig_amplitude: 000: 1/4, 001: 1/2, 010: 1, 011: 2, 100: 4
 
-    s_ChannelOneSample <= unsigned(s_sample_ch1_out sll 2) + unsigned(Offset_ch1) when Sig_amplitude = "000" and state /= SWAP else
-                          unsigned(s_sample_ch1_out sll 1) + unsigned(Offset_ch1) when Sig_amplitude = "001" and state /= SWAP else
-                          unsigned(s_sample_ch1_out srl 1) + unsigned(Offset_ch1) when Sig_amplitude = "011" and state /= SWAP else
-                          unsigned(s_sample_ch1_out srl 2) + unsigned(Offset_ch1) when Sig_amplitude = "100" and state /= SWAP else
-                          unsigned(s_sample_ch1_out) + unsigned(Offset_ch1) when Sig_amplitude = "010" and state /= SWAP else
+    s_ChannelOneSample <= resize(unsigned(s_sample_ch1_out srl 2) + (unsigned(Offset_ch1)*16),10) when Sig_amplitude_ch1 = "000" and state /= SWAP else
+                          resize(unsigned(s_sample_ch1_out srl 1) + (unsigned(Offset_ch1)*16),10) when Sig_amplitude_ch1 = "001" and state /= SWAP else
+                          resize(unsigned(s_sample_ch1_out sll 1) + (unsigned(Offset_ch1)*16),10) when Sig_amplitude_ch1 = "011" and state /= SWAP else
+                          resize(unsigned(s_sample_ch1_out sll 2) + (unsigned(Offset_ch1)*16),10) when Sig_amplitude_ch1 = "100" and state /= SWAP else
+                          resize(unsigned(s_sample_ch1_out) + (unsigned(Offset_ch1)*16),10) when Sig_amplitude_ch1 = "010" and state /= SWAP else
                           (others => '0');
 
-    s_ChannelTwoSample <= unsigned(s_sample_ch2_out sll 2) + unsigned(Offset_ch2) when Sig_amplitude = "000" and state /= SWAP else
-                          unsigned(s_sample_ch2_out sll 1) + unsigned(Offset_ch2) when Sig_amplitude = "001" and state /= SWAP else
-                          unsigned(s_sample_ch2_out srl 1) + unsigned(Offset_ch2) when Sig_amplitude = "011" and state /= SWAP else
-                          unsigned(s_sample_ch2_out srl 2) + unsigned(Offset_ch2) when Sig_amplitude = "100" and state /= SWAP else
-                          unsigned(s_sample_ch2_out) + unsigned(Offset_ch2) when Sig_amplitude = "010" and state /= SWAP else
+    s_ChannelTwoSample <= resize(unsigned(s_sample_ch2_out srl 2) + (unsigned(Offset_ch2)*16),10) when Sig_amplitude_ch2 = "000" and state /= SWAP else
+                          resize(unsigned(s_sample_ch2_out srl 1) + (unsigned(Offset_ch2)*16),10) when Sig_amplitude_ch2 = "001" and state /= SWAP else
+                          resize(unsigned(s_sample_ch2_out sll 1) + (unsigned(Offset_ch2)*16),10) when Sig_amplitude_ch2 = "011" and state /= SWAP else
+                          resize(unsigned(s_sample_ch2_out sll 2) + (unsigned(Offset_ch2)*16),10) when Sig_amplitude_ch2 = "100" and state /= SWAP else
+                          resize(unsigned(s_sample_ch2_out) + (unsigned(Offset_ch2)*16),10) when Sig_amplitude_ch2 = "010" and state /= SWAP else
                           (others => '0');
 
     ChannelOneSample <= std_logic_vector(s_ChannelOneSample);
