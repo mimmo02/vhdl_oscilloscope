@@ -49,6 +49,9 @@ architecture test_bench of tb_memory_handler is
     signal s_begin_tast_memory_storage : std_logic := '0';
     signal s_stop_test : std_logic := '0';
 
+    signal counter : integer := 0;
+    signal test_num : std_logic_vector(1 downto 0) := "00";
+
 begin
 
     DUT: entity work.memory_handler
@@ -128,8 +131,7 @@ begin
     end process NSL;
     
 
-
-    MAIN: process is
+    RESET: process is
     begin
 
         -- wait two clock cycles + 5 ns to center the operations in clock rising edge
@@ -140,10 +142,7 @@ begin
         wait for 10 ns;
         s_rst <= '0';
 
-
         s_begin_test_trigger <= '1';
-
-
 
         ---- Test memory read
         -- assert s_dout = samples(2) 
@@ -151,37 +150,74 @@ begin
         --    severity error;
 
         wait;
-    end process MAIN;
+    end process RESET;
+
+
 
     TEST_TRIGGER: process(s_clk) is
-        variable counter : integer := 0;
     begin
         if s_state = TRIGGER_TEST then 
-            s_TriggerLevel <= "010110"; -- 22 in the middle
-            s_TriggerPos <= "010000";    -- 20 in the middle
-            s_Trigger_ch1 <= '1';
-            s_Trigger_on_rising <= '1';
-            s_TimeBase <= "000"; --1 sample per pixel
-
+            s_NextScreen <= '0';
             if rising_edge(s_clk) and s_valid_in = '1' then
-                counter := counter + 1;
-                if counter < 101 then                    -- check that trigger is not taken in the first half of the buffer
+                counter <= counter + 1;
+
+                -- first trigger test - - - - - - - - - - - - - - - - - - - - -
+                -- trigger in the second half of the buffer on ch1 rising edge
+                if test_num = "00" then
+                    s_TriggerLevel <= "010110"; -- 22 in the middle
+                    s_TriggerPos <= "010000";    -- 20 in the middle
+                    s_Trigger_ch1 <= '1';
+                    s_Trigger_on_rising <= '1';
+                    s_TimeBase <= "000"; --1 sample per pixel 
+                end if;
+
+                if counter < 101 and test_num = "00" then                    -- check that trigger is not taken in the first half of the buffer
                     s_SampleOne <= "000000000"; -- 0
                     s_SampleTwo <= "000000000"; -- 0
-                elsif counter < 111 then
+                elsif counter < 111 and test_num = "00" then
                     s_SampleOne <= "110010000"; -- 400
-                    s_SampleTwo <= "110010000"; -- 400
-                elsif counter < 5000 then
-                    s_SampleOne <= "000000000"; -- 400
-                    s_SampleTwo <= "000000000"; -- 400
-                else
+                    s_SampleTwo <= "000000000"; -- 0
+                elsif counter < 5000 and test_num = "00" then
+                    s_SampleOne <= "000000000"; -- 0
+                    s_SampleTwo <= "000000000"; -- 0
+                elsif test_num = "00" then
                     s_SampleOne <= "110010000"; -- 400
-                    s_SampleTwo <= "110010000"; -- 400
+                    s_SampleTwo <= "000000000"; -- 0
                 end if;
 
-                if counter = 10000 then 
-                    s_stop_test <= '1';
+                -- second trigger test - - - - - - - - - - - - - - - - - - - - -
+                -- trigger in the first half of the buffer on ch2 falling edge
+                if test_num = "01" then
+                    s_TriggerLevel <= "010110"; -- 22 in the middle
+                    s_TriggerPos <= "010000";    -- 20 in the middle
+                    s_Trigger_ch1 <= '0';
+                    s_Trigger_on_rising <= '0';
+                    s_TimeBase <= "000"; --1 sample per pixel 
                 end if;
+
+                if counter < 101 and test_num = "01" then                    -- check that trigger is not taken in the first half of the buffer
+                    s_SampleOne <= "110010000"; -- 400
+                    s_SampleTwo <= "110010000"; -- 400
+                elsif counter < 111 and test_num = "01" then
+                    s_SampleOne <= "110010000"; -- 400
+                    s_SampleTwo <= "000000000"; -- 0
+                elsif counter < 9200 and test_num = "01" then               -- first half of the buffer: 8192 samples (whole buffer) + 1000
+                    s_SampleOne <= "110010000"; -- 400
+                    s_SampleTwo <= "110010000"; -- 400
+                elsif test_num = "01" then
+                    s_SampleOne <= "110010000"; -- 400
+                    s_SampleTwo <= "000000000"; -- 0
+                end if;
+
+
+
+
+            end if;
+
+            if counter = 10000 and test_num = "00" then 
+                counter <= 0;
+                test_num <= "01";
+                s_NextScreen <= '1';
             end if;
         end if;
     end process TEST_TRIGGER;

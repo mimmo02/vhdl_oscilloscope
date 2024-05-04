@@ -100,7 +100,7 @@ begin
     begin
         if rst = '1' then
             state <= WAIT_PRE_TRIGGER;
-        elsif rising_edge(clk) then
+        elsif rising_edge(clk) or state /= state_next then
             state <= state_next;
         end if;
     end process REG;
@@ -155,34 +155,32 @@ begin
     begin
         if state = PRE_TRIGGER then                         -- detect trigger event only in the pre-trigger state
             if valid_in = '1' then
-                if s_write_counter > c_sample_number/2 then           -- consider trigger event only if it appens im the secon half of samples
-                    if Trigger_ch1 = '1' then               -- trigger on channel 1
-                        if Trigger_on_rising = '1' then     -- trigger on rising edge
-                            if unsigned(s_sample_in_ch1_pre) < (unsigned(Trigger_ref)*16) and unsigned(sample_in_ch1) >= (unsigned(Trigger_ref)*16) then
-                                s_event_trigger <= '1';
-                            else 
-                                s_event_trigger <= '0';
-                            end if;
-                        else                                -- trigger on falling edge  
-                            if unsigned(s_sample_in_ch1_pre) > (unsigned(Trigger_ref)*16) and unsigned(sample_in_ch1) <= (unsigned(Trigger_ref)*16) then
-                                s_event_trigger <= '1';
-                            else 
-                                s_event_trigger <= '0';
-                            end if;
+                if Trigger_ch1 = '1' then               -- trigger on channel 1
+                    if Trigger_on_rising = '1' then     -- trigger on rising edge
+                        if unsigned(s_sample_in_ch1_pre) < (unsigned(Trigger_ref)*16) and unsigned(sample_in_ch1) >= (unsigned(Trigger_ref)*16) then
+                            s_event_trigger <= '1';
+                        else 
+                            s_event_trigger <= '0';
                         end if;
-                    else                                    -- trigger on channel 2
-                        if Trigger_on_rising = '1' then     -- trigger on rising edge
-                            if unsigned(s_sample_in_ch2_pre) < (unsigned(Trigger_ref)*16) and unsigned(sample_in_ch2) >= (unsigned(Trigger_ref)*16) then
-                                s_event_trigger <= '1';
-                            else 
-                                s_event_trigger <= '0';
-                            end if;
-                        else                                -- trigger on falling edge  
-                            if unsigned(s_sample_in_ch2_pre) > (unsigned(Trigger_ref)*16) and unsigned(sample_in_ch2) <= (unsigned(Trigger_ref)*16) then
-                                s_event_trigger <= '1';
-                            else 
-                                s_event_trigger <= '0';
-                            end if;
+                    else                                -- trigger on falling edge  
+                        if unsigned(s_sample_in_ch1_pre) > (unsigned(Trigger_ref)*16) and unsigned(sample_in_ch1) <= (unsigned(Trigger_ref)*16) then
+                            s_event_trigger <= '1';
+                        else 
+                            s_event_trigger <= '0';
+                        end if;
+                    end if;
+                else                                    -- trigger on channel 2
+                    if Trigger_on_rising = '1' then     -- trigger on rising edge
+                        if unsigned(s_sample_in_ch2_pre) < (unsigned(Trigger_ref)*16) and unsigned(sample_in_ch2) >= (unsigned(Trigger_ref)*16) then
+                            s_event_trigger <= '1';
+                        else 
+                            s_event_trigger <= '0';
+                        end if;
+                    else                                -- trigger on falling edge  
+                        if unsigned(s_sample_in_ch2_pre) > (unsigned(Trigger_ref)*16) and unsigned(sample_in_ch2) <= (unsigned(Trigger_ref)*16) then
+                            s_event_trigger <= '1';
+                        else 
+                            s_event_trigger <= '0';
                         end if;
                     end if;
                 end if;
@@ -228,12 +226,10 @@ begin
     -- generate the swap event for the state machine
     MEMORY_SWAP : process(NextScreen) is
     begin
-        if state = END_FILL then 
-            if NextScreen = '1' then    -- swap memory when the display request a new screen
-                s_event_swap <= '1';
-            else
-                s_event_swap <= '0';
-            end if;
+        if state = END_FILL and NextScreen = '1' then -- swap memory when the memory is full and the display request a new screen   
+            s_event_swap <= '1';
+        else
+            s_event_swap <= '0';
         end if;
     end process MEMORY_SWAP;
 
@@ -268,9 +264,12 @@ begin
     -----------------------------------------------------------------------------------------------
     -- RAM
     -----------------------------------------------------------------------------------------------
-
-    s_ram_select <= not s_ram_select when state = SWAP else   -- swap memory
-                    s_ram_select; 
+    RAM_SELECT : process(state) is
+    begin
+        if state = SWAP then
+            s_ram_select <= not s_ram_select;
+        end if;
+    end process RAM_SELECT;
 
     -- READ ENABLE --------------------------------------------------------------------------------
 
