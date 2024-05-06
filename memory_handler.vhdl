@@ -63,13 +63,18 @@ architecture platform_indipendent of memory_handler is
     signal s_write_counter   : unsigned(12 downto 0) := (others => '0');
     signal s_read_counter    : unsigned(12 downto 0) := (others => '0');
     signal s_trigger_address : unsigned(12 downto 0) := (others => '0');
-    signal s_pixel_step      : unsigned(2 downto 0);
+    signal s_trigger_address_memory_1 : unsigned(12 downto 0) := (others => '0');
+    signal s_trigger_address_memory_2 : unsigned(12 downto 0) := (others => '0');
 
     signal s_sample_in_ch1_pre : std_logic_vector(8 downto 0) := (others => '0');
     signal s_sample_in_ch2_pre : std_logic_vector(8 downto 0) := (others => '0');
 
-    signal s_sample_ch1_out  : std_logic_vector(8 downto 0);
-    signal s_sample_ch2_out  : std_logic_vector(8 downto 0);
+    signal s_sample_ch1_out_1  : std_logic_vector(8 downto 0);
+    signal s_sample_ch1_out_2  : std_logic_vector(8 downto 0);
+    signal s_sample_ch1_out    : std_logic_vector(8 downto 0);
+    signal s_sample_ch2_out_1  : std_logic_vector(8 downto 0);
+    signal s_sample_ch2_out_2  : std_logic_vector(8 downto 0);
+    signal s_sample_ch2_out    : std_logic_vector(8 downto 0);
     signal s_ChannelOneSample : unsigned(9 downto 0);
     signal s_ChannelTwoSample : unsigned(9 downto 0);
     signal s_write_address   : unsigned(12 downto 0);
@@ -153,7 +158,7 @@ begin
     -- generate the trigger event for the state machine
     TRIGGER : process(valid_in) is  
     begin
-        if state = PRE_TRIGGER then                         -- detect trigger event only in the pre-trigger state
+        if state = PRE_TRIGGER then                     -- detect trigger event only in the pre-trigger state
             if valid_in = '1' then
                 if Trigger_ch1 = '1' then               -- trigger on channel 1
                     if Trigger_on_rising = '1' then     -- trigger on rising edge
@@ -289,33 +294,35 @@ begin
     -- WRITE ENABLE --------------------------------------------------------------------------------
 
     -- ram0 write enable
-    s_write_ram0 <= '1' when (state = PRE_TRIGGER or state = POST_TRIGGER) and valid_in = '1' and s_ram_select = '1' else 
+    s_write_ram0 <= '1' when (state = WAIT_PRE_TRIGGER or state = PRE_TRIGGER or state = POST_TRIGGER) and valid_in = '1' and s_ram_select = '1' else 
                     '0';
     -- ram1 write enable
-    s_write_ram1 <= '1' when (state = PRE_TRIGGER or state = POST_TRIGGER) and valid_in = '1' and s_ram_select = '0' else 
+    s_write_ram1 <= '1' when (state = WAIT_PRE_TRIGGER or state = PRE_TRIGGER or state = POST_TRIGGER) and valid_in = '1' and s_ram_select = '0' else 
                     '0';
     -- ram2 write enable
-    s_write_ram2 <= '1' when (state = PRE_TRIGGER or state = POST_TRIGGER) and valid_in = '1' and s_ram_select = '1' else 
+    s_write_ram2 <= '1' when (state = WAIT_PRE_TRIGGER or state = PRE_TRIGGER or state = POST_TRIGGER) and valid_in = '1' and s_ram_select = '1' else 
                     '0';
     -- ram3 write enable
-    s_write_ram3 <= '1' when (state = PRE_TRIGGER or state = POST_TRIGGER) and valid_in = '1' and s_ram_select = '0' else 
+    s_write_ram3 <= '1' when (state = WAIT_PRE_TRIGGER or state = PRE_TRIGGER or state = POST_TRIGGER) and valid_in = '1' and s_ram_select = '0' else 
                     '0';
 
-    -- set pixels step (number of samples per pixel)
-    s_pixel_step <= "001" when TimeBase = "000" else      -- 1 sample per pixel
-                    "010" when TimeBase = "001" else      -- 2 samples per pixel
-                    "011" when TimeBase = "010" else      -- 3 samples per pixel
-                    "100" when TimeBase = "011" else      -- 4 samples per pixel  
-                    "101" when TimeBase = "100" else      -- 5 samples per pixel
-                    "110" when TimeBase = "101" else      -- 6 samples per pixel  
-                    "001";                                -- default 1 sample per pixel
 
     -- ADDRESSES COMPUTATION ------------------------------------------------------------------------
 
     s_write_address <= s_write_counter;
 
+    -- distinguish the trigger address in the two memory
+    TRIGGER_ADDRESS_MEMORY : process(s_trigger_address) is
+    begin
+        if s_ram_select = '0' then
+            s_trigger_address_memory_1 <= s_trigger_address;
+        else
+            s_trigger_address_memory_2 <= s_trigger_address;
+        end if;
+    end process TRIGGER_ADDRESS_MEMORY;
 
-    s_read_address <= resize(s_trigger_address - (s_pixel_step * (c_pixels_number/2)) + (s_read_counter * s_pixel_step) - ((c_pixels_number/2) + (unsigned(Trigger_pos)*32)),13);
+    s_read_address <= resize(( s_trigger_address_memory_1 - (to_integer(TimeBase) * (c_pixels_number/2)) + (to_integer(s_read_counter) * to_integer(TimeBase)) - (c_pixels_number/2) + (to_integer(unsigned(Trigger_pos)*32))) ,13) when s_ram_select = '1' else
+                      resize(( s_trigger_address_memory_2 - (to_integer(TimeBase) * (c_pixels_number/2)) + (to_integer(s_read_counter) * to_integer(TimeBase)) - (c_pixels_number/2) + (to_integer(unsigned(Trigger_pos)*32))) ,13);
 
 
     -- ram0 address
@@ -342,6 +349,12 @@ begin
 
     -- Sig_amplitude: 000: 1/4, 001: 1/2, 010: 1, 011: 2, 100: 4
 
+    s_sample_ch1_out <= s_sample_ch1_out_1 when s_ram_select = '0' else
+                        s_sample_ch1_out_2;
+
+    s_sample_ch2_out <= s_sample_ch2_out_1 when s_ram_select = '0' else
+                        s_sample_ch2_out_2;
+
     s_ChannelOneSample <= resize(unsigned(s_sample_ch1_out srl 2) + (unsigned(Offset_ch1)*16),10) when Sig_amplitude_ch1 = "000" and state /= SWAP else
                           resize(unsigned(s_sample_ch1_out srl 1) + (unsigned(Offset_ch1)*16),10) when Sig_amplitude_ch1 = "001" and state /= SWAP else
                           resize(unsigned(s_sample_ch1_out sll 1) + (unsigned(Offset_ch1)*16),10) when Sig_amplitude_ch1 = "011" and state /= SWAP else
@@ -367,9 +380,9 @@ begin
             clk => clk,
             we => s_write_ram0,
             re => s_read_ram0,
-            addr => std_logic_vector(s_write_counter),
+            addr => s_ram0_address,
             din => sample_in_ch1,
-            dout => s_sample_ch1_out
+            dout => s_sample_ch1_out_1
         );
 
     -- samples ch1 second buffer
@@ -378,9 +391,9 @@ begin
             clk => clk,
             we => s_write_ram1,
             re => s_read_ram1,
-            addr => std_logic_vector(s_write_counter),
+            addr => s_ram1_address,
             din => sample_in_ch1,
-            dout => s_sample_ch1_out
+            dout => s_sample_ch1_out_2
         );
 
     -- samples ch2 first buffer
@@ -389,9 +402,9 @@ begin
             clk => clk,
             we => s_write_ram2,
             re => s_read_ram2,
-            addr => std_logic_vector(s_write_counter),
+            addr => s_ram2_address,
             din => sample_in_ch2,
-            dout => s_sample_ch2_out
+            dout => s_sample_ch2_out_1
         );
 
     -- samples ch2 second buffer
@@ -400,9 +413,9 @@ begin
             clk => clk,
             we => s_write_ram3,
             re => s_read_ram3,
-            addr => std_logic_vector(s_write_counter),
+            addr => s_ram3_address,
             din => sample_in_ch2,
-            dout => s_sample_ch2_out
+            dout => s_sample_ch2_out_2
         );
    
 end architecture platform_indipendent;
