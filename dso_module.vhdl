@@ -58,94 +58,77 @@ architecture platform_independent of dso_module is
     signal s_HDMI_CLOCK : std_logic;
     signal s_ACTIVE_VIDEO : std_logic;
 
-    signal myLevel1 : std_logic_vector(9 downto 0) := "0000000000";
-    signal myLevel2 : std_logic_vector(9 downto 0) := "0000000000";
+    signal s_RequestSample : std_logic;
+    signal s_NextLine : std_logic;
+    signal s_NextScreen : std_logic;
+
+    signal s_ChannelOneOn : std_logic;
+    signal s_ChannelTwoOn : std_logic;
+    signal s_ChannelOneDot : std_logic;
+    signal s_ChannelTwoDot : std_logic;
+    signal s_Trigger_ref : std_logic_vector(5 downto 0);
+    signal s_Trigger_pos : std_logic_vector(5 downto 0);
+    signal s_Offset_ch1 : std_logic_vector(5 downto 0);
+    signal s_Offset_ch2 : std_logic_vector(5 downto 0);
+    signal s_ChannelOneSample : std_logic_vector(9 downto 0);
+    signal s_ChannelTwoSample : std_logic_vector(9 downto 0);
+    signal s_ChannelOneOffset : std_logic_vector(9 downto 0);
+    signal s_ChannelTwoOffset : std_logic_vector(9 downto 0);
+    signal s_TriggerLevel : std_logic_vector(9 downto 0);
+    signal s_TriggerPoint : std_logic_vector(10 downto 0);
+    signal s_TriggerChannelOne : std_logic;
+    signal s_amplitude_ch1 : std_logic_vector(2 downto 0);
+    signal s_amplitude_ch2 : std_logic_vector(2 downto 0);
+
+    signal s_TriggerOnRising : std_logic;
+    signal s_TimeBase : std_logic_vector(2 downto 0);
+
+    -- ADC
+    signal s_Sample_ADC_ch1 : std_logic_vector(8 downto 0);
+    signal s_Sample_ADC_ch2 : std_logic_vector(8 downto 0);
+    signal s_ValidIn_ADC : std_logic;
+
 
 begin
 
-    -- implement your system here
+    -- DISPLAY
 
-    -- DISPLAY : entity work.display_module(platform_independent)
-    --     port map(
-    --         clk_148_5_MHz       => clk_148_5_MHz,
-    --         reset               => reset,
+    s_TriggerLevel <= std_logic_vector(unsigned(s_Trigger_ref) * 16);
+    s_TriggerPoint <= std_logic_vector(unsigned(s_Trigger_pos) * 32);
+    s_ChannelOneOffset <= std_logic_vector(unsigned(s_Offset_ch1) * 16);
+    s_ChannelTwoOffset <= std_logic_vector(unsigned(s_Offset_ch2) * 16);
+
+    DISPLAY : entity work.display_module(platform_independent)
+        port map(
+            clk_148_5_MHz       => clk_148_5_MHz,
+            reset               => reset,
         
-    --         ChannelOneOn        => '1',
-    --         ChannelTwoOn        => '1',
-    --         ChannelOneDot       => '0',
-    --         ChannelTwoDot       => '0', 
-    --         ChannelOneSample    => "1010111100",    -- 700
-    --         ChannelTwoSample    => "1010111100",    -- 700
-    --         ChannelOneOffset    => "0000101101",    -- 45
-    --         ChannelTwoOffset    => "0010000111",    -- 135
-    --         TriggerLevel        => "0101101010",    -- 360
-    --         TriggerPoint        => "00111110100",    -- 500
-    --         TriggerChannelOne   => '1',
+            ChannelOneOn        => s_ChannelOneOn,
+            ChannelTwoOn        => s_ChannelTwoOn,
+            ChannelOneDot       => s_ChannelOneDot,
+            ChannelTwoDot       => s_ChannelTwoDot, 
+            ChannelOneSample    => s_ChannelOneSample,    
+            ChannelTwoSample    => s_ChannelTwoSample,
+            ChannelOneOffset    => s_ChannelOneOffset,
+            ChannelTwoOffset    => s_ChannelTwoOffset,
+            TriggerLevel        => s_TriggerLevel,
+            TriggerPoint        => s_TriggerPoint,
+            TriggerChannelOne   => s_TriggerChannelOne,
 
-    --         RequestSample       => open,
-    --         NextLine            => open,
-    --         NextScreen          => open,
+            RequestSample       => s_RequestSample,
+            NextLine            => s_NextLine,
+            NextScreen          => s_NextScreen,
 
-    --         HSYNC               => s_HSYNC,                        -- Horizontal synchronization signal
-    --         VSYNC               => s_VSYNC,                        -- Vertical synchronization signal
-    --         RED                 => s_RED,                          -- Red color channel
-    --         GREEN               => s_GREEN,                        -- Green color channel
-    --         BLUE                => s_BLUE,                         -- Blue color channel
-    --         HDMI_CLOCK          => s_HDMI_CLOCK,                   -- Clock signal for the HDMI interface
-    --         ACTIVE_VIDEO        => s_ACTIVE_VIDEO                  -- Active video signal for the HDMI interface
+            HSYNC               => s_HSYNC,                        -- Horizontal synchronization signal
+            VSYNC               => s_VSYNC,                        -- Vertical synchronization signal
+            RED                 => s_RED,                          -- Red color channel
+            GREEN               => s_GREEN,                        -- Green color channel
+            BLUE                => s_BLUE,                         -- Blue color channel
+            HDMI_CLOCK          => s_HDMI_CLOCK,                   -- Clock signal for the HDMI interface
+            ACTIVE_VIDEO        => s_ACTIVE_VIDEO                  -- Active video signal for the HDMI interface
 
 
-    --     );
-
-        -- ONDA : process(clk_148_5_MHz)
-        --     variable level : integer := 0;
-        -- begin
-        --     if rising_edge(clk_148_5_MHz) then
-        --         if level = 128 then
-        --             level := 0;
-        --         else
-        --             level := level + 1;
-        --         end if;
-        --         myLevel1 <= std_logic_vector(to_unsigned(level + 200, 10));
-        --         myLevel2 <= std_logic_vector(to_unsigned(level + 400, 10));
-        --     end if;
-            
-        -- end process ONDA;
-
-        -- ONDA2 : process(clk_148_5_MHz)
-        --     variable count : integer := 1;
-        -- begin
-        --     if rising_edge(clk_148_5_MHz) then
-        --         if count <= 64 then
-        --             count := count + 1;
-        --             myLevel1 <= std_logic_vector(to_unsigned(500, 10));
-        --             myLevel2 <= std_logic_vector(to_unsigned(400, 10));
-        --         elsif count <= 127 then
-        --             count := count + 1;
-        --             myLevel1 <= std_logic_vector(to_unsigned(300, 10));
-        --             myLevel2 <= std_logic_vector(to_unsigned(100, 10));
-        --         else
-        --             count := 1;
-        --         end if;
-                
-        --     end if;
-            
-        -- end process ONDA2;
-
-    TEST : entity work.test_screen(platform_independant)
-        port map (
-            clk_148_5_MHz => clk_148_5_MHz,
-            reset         => reset,
-
-            HSYNC         => s_HSYNC,
-            VSYNC         => s_VSYNC,
-            RED           => s_RED,
-            GREEN         => s_GREEN,
-            BLUE          => s_BLUE,
-            HDMI_CLOCK    => s_HDMI_CLOCK,
-            ACTIVE_VIDEO  => s_ACTIVE_VIDEO
         );
-
 
         HSYNC <= s_HSYNC;
         VSYNC <= s_VSYNC;
@@ -155,6 +138,71 @@ begin
         HDMI_CLOCK <= s_HDMI_CLOCK;
         ACTIVE_VIDEO <= s_ACTIVE_VIDEO;
 
+    -- MEMORY HANDLER
+
+    MEMORY_HANDLER : entity work.memory_handler(platform_independent)
+        port map(
+            clk => clk_148_5_MHz,               
+            rst => reset,               
+
+            -- trigger
+            Trigger_ref => s_Trigger_ref,        
+            Trigger_pos => s_Trigger_pos,   
+            Trigger_ch1 => s_TriggerChannelOne,         
+            Trigger_on_rising => s_TriggerOnRising,
+            TimeBase => s_TimeBase,            
+
+            -- ADC
+            sample_in_ch1 => s_Sample_ADC_ch1,     
+            sample_in_ch2 => s_Sample_ADC_ch2,     
+            valid_in => s_ValidIn_ADC,           
+
+            -- display
+            RequestSample => s_RequestSample,     
+            NextLine => s_NextLine,           
+            NextScreen => s_NextScreen,       
+
+            Offset_ch1 => s_Offset_ch1,         
+            Offset_ch2 => s_Offset_ch2,      
+            Sig_amplitude_ch1 => s_amplitude_ch1,  
+            Sig_amplitude_ch2 => s_amplitude_ch2,  
+            
+            ChannelOneSample => s_ChannelOneSample,   
+            ChannelTwoSample => s_ChannelTwoSample   
+        );
+
+    -- DAC 
+
+    -- ADC
+
+    -- SYSTEM FSM
+
+    -- LED MATRIX
+
+    -- 7 SEG
+    DISPLAY_7_SEG1 : entity work.bcd_to_7seg(dfl)
+        port map(
+            bcd => -- number to show
+            seg => seg1
+        );
+
+    DISPLAY_7_SEG2 : entity work.bcd_to_7seg(dfl)   
+        port map(
+            bcd => -- number to show
+            seg => seg2
+        );
+
+    DISPLAY_7_SEG3 : entity work.bcd_to_7seg(dfl)
+        port map(
+            bcd => -- number to show
+            seg => seg3
+        );
+
+    DISPLAY_7_SEG4 : entity work.bcd_to_7seg(dfl)
+        port map(
+            bcd => -- number to show
+            seg => seg4
+        );
 				
 
 end architecture platform_independent;
