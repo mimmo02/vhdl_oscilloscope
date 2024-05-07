@@ -176,8 +176,39 @@ begin
     -- ADC
 
     -- SYSTEM FSM
+    DSO_CONTROL : entity work.dso_control(?)
+        port map (
+            clk_148_5_MHz => clk_148_5_MHz,
+            reset => reset,
+            btn_sel_channel => btn_sel_channel,
+            btn_sel_parameter => btn_sel_parameter,
+            btn_sel_acq_mode => btn_sel_acq_mode,
+            btn_run => btn_run,
+            btn_plus => btn_plus,
+            btn_minus => btn_minus,
+ 
+            Sel_Chan => led_matrix(0)(0 to 1),
+            Sel_Para => led_matrix(1)(0 to 2),
+ 
+            Offset_ch1 => s_Offset_ch1,
+            Sig_amplitude_ch1 => s_amplitude_ch1,
+            ChannelOneOn => s_ChannelOneOn,
+            ChannelOneDot => s_ChannelOneDot,
+ 
+            Offset_ch2 => s_Offset_ch2,
+            Sig_amplitude_ch2 => s_amplitude_ch2,
+            ChannelTwoOn => s_ChannelTwoOn,
+            ChannelTwoDot => s_ChannelTwoDot,
+ 
+            Trigger_ref => s_Trigger_ref,
+            Trigger_pos => s_Trigger_pos,
+            Trigger_ch1 => s_TriggerChannelOne,
+            Trigger_on_rising => s_TriggerOnRising,
+ 
+            TimeBase => s_TimeBase);
 
     -- LED MATRIX
+    
 
     -- 7 SEG
     DISPLAY_7_SEG1 : entity work.bcd_to_7seg(dfl)
