@@ -7,7 +7,9 @@
 -- description: This file contains the VHDL code for the memory handler module. The module is responsible for
 --              handling the memory of the system. It receives the samples from the ADC and stores them in the
 --              memory in a strategic way. The module is also responsible for the trigger event generation. 
---              The trigger event is generated when the sample value is greater than the trigger level.              
+--              The trigger event is generated when the sample value is greater than the trigger level. It
+--              provides the samples to the display module when requested. The module is also responsible for
+--              the memory swap when the memory is full and the display requests a new screen.            
 ---------------------------------------------------------------------------------------------------------------
 library ieee;
 use ieee.std_logic_1164.all;
@@ -355,17 +357,17 @@ begin
     s_sample_ch2_out <= s_sample_ch2_out_1 when s_ram_select = '0' else
                         s_sample_ch2_out_2;
 
-    s_ChannelOneSample <= resize(unsigned(s_sample_ch1_out srl 2) + (unsigned(Offset_ch1)*16),10) when Sig_amplitude_ch1 = "000" and state /= SWAP else
-                          resize(unsigned(s_sample_ch1_out srl 1) + (unsigned(Offset_ch1)*16),10) when Sig_amplitude_ch1 = "001" and state /= SWAP else
-                          resize(unsigned(s_sample_ch1_out sll 1) + (unsigned(Offset_ch1)*16),10) when Sig_amplitude_ch1 = "011" and state /= SWAP else
-                          resize(unsigned(s_sample_ch1_out sll 2) + (unsigned(Offset_ch1)*16),10) when Sig_amplitude_ch1 = "100" and state /= SWAP else
+    s_ChannelOneSample <= resize(shift_right(unsigned(s_sample_ch1_out),2) + (unsigned(Offset_ch1)*16),10) when Sig_amplitude_ch1 = "000" and state /= SWAP else
+                          resize(shift_right(unsigned(s_sample_ch1_out),1) + (unsigned(Offset_ch1)*16),10) when Sig_amplitude_ch1 = "001" and state /= SWAP else
+                          resize(shift_left(unsigned(s_sample_ch1_out),1) + (unsigned(Offset_ch1)*16),10) when Sig_amplitude_ch1 = "011" and state /= SWAP else
+                          resize(shift_left(unsigned(s_sample_ch1_out),2) + (unsigned(Offset_ch1)*16),10) when Sig_amplitude_ch1 = "100" and state /= SWAP else
                           resize(unsigned(s_sample_ch1_out) + (unsigned(Offset_ch1)*16),10) when Sig_amplitude_ch1 = "010" and state /= SWAP else
                           (others => '0');
 
-    s_ChannelTwoSample <= resize(unsigned(s_sample_ch2_out srl 2) + (unsigned(Offset_ch2)*16),10) when Sig_amplitude_ch2 = "000" and state /= SWAP else
-                          resize(unsigned(s_sample_ch2_out srl 1) + (unsigned(Offset_ch2)*16),10) when Sig_amplitude_ch2 = "001" and state /= SWAP else
-                          resize(unsigned(s_sample_ch2_out sll 1) + (unsigned(Offset_ch2)*16),10) when Sig_amplitude_ch2 = "011" and state /= SWAP else
-                          resize(unsigned(s_sample_ch2_out sll 2) + (unsigned(Offset_ch2)*16),10) when Sig_amplitude_ch2 = "100" and state /= SWAP else
+    s_ChannelTwoSample <= resize(shift_right(unsigned(s_sample_ch2_out),2) + (unsigned(Offset_ch2)*16),10) when Sig_amplitude_ch2 = "000" and state /= SWAP else
+                          resize(shift_right(unsigned(s_sample_ch2_out),1) + (unsigned(Offset_ch2)*16),10) when Sig_amplitude_ch2 = "001" and state /= SWAP else
+                          resize(shift_left(unsigned(s_sample_ch2_out),1) + (unsigned(Offset_ch2)*16),10) when Sig_amplitude_ch2 = "011" and state /= SWAP else
+                          resize(shift_left(unsigned(s_sample_ch2_out),2) + (unsigned(Offset_ch2)*16),10) when Sig_amplitude_ch2 = "100" and state /= SWAP else
                           resize(unsigned(s_sample_ch2_out) + (unsigned(Offset_ch2)*16),10) when Sig_amplitude_ch2 = "010" and state /= SWAP else
                           (others => '0');
 
