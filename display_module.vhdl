@@ -229,4 +229,3 @@ begin
              '0';
 
 end platform_independent;
-
