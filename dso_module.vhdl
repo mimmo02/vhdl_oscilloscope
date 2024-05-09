@@ -79,24 +79,25 @@ architecture platform_independent of dso_module is
     signal s_TriggerChannelOne : std_logic;
     signal s_amplitude_ch1 : std_logic_vector(2 downto 0);
     signal s_amplitude_ch2 : std_logic_vector(2 downto 0);
+    signal s_Sel_Chan : std_logic_vector(1 downto 0);
+    signal s_Sel_Para : std_logic_vector(2 downto 0);
 
     signal s_TriggerOnRising : std_logic;
     signal s_TimeBase : std_logic_vector(2 downto 0);
 
     -- ADC
-    signal s_Sample_ADC_ch1 : std_logic_vector(8 downto 0);
-    signal s_Sample_ADC_ch2 : std_logic_vector(8 downto 0);
+    signal s_Sample_ADC_ch1 : std_logic_vector(11 downto 0);
+    signal s_Sample_ADC_ch2 : std_logic_vector(11 downto 0);
     signal s_ValidIn_ADC : std_logic;
-
 
 begin
 
     -- DISPLAY
 
-    s_TriggerLevel <= std_logic_vector(unsigned(s_Trigger_ref) * 16);
-    s_TriggerPoint <= std_logic_vector(unsigned(s_Trigger_pos) * 32);
-    s_ChannelOneOffset <= std_logic_vector(unsigned(s_Offset_ch1) * 16);
-    s_ChannelTwoOffset <= std_logic_vector(unsigned(s_Offset_ch2) * 16);
+    s_TriggerLevel <= s_Trigger_ref & "0000";
+    s_TriggerPoint <= s_Trigger_pos & "00000";
+    s_ChannelOneOffset <= s_Offset_ch1 & "0000";
+    s_ChannelTwoOffset <= s_Offset_ch2 & "0000";
 
     DISPLAY : entity work.display_module(platform_independent)
         port map(
@@ -146,15 +147,15 @@ begin
             rst => reset,               
 
             -- trigger
-            Trigger_ref => s_Trigger_ref,        
+            Trigger_ref =>  s_Trigger_ref,        
             Trigger_pos => s_Trigger_pos,   
             Trigger_ch1 => s_TriggerChannelOne,         
             Trigger_on_rising => s_TriggerOnRising,
-            TimeBase => s_TimeBase,            
+            TimeBase => unsigned(s_TimeBase),            
 
             -- ADC
-            sample_in_ch1 => s_Sample_ADC_ch1,     
-            sample_in_ch2 => s_Sample_ADC_ch2,     
+            sample_in_ch1 => s_Sample_ADC_ch1(11 downto 3),     
+            sample_in_ch2 => s_Sample_ADC_ch2(11 downto 3),     
             valid_in => s_ValidIn_ADC,           
 
             -- display
@@ -162,21 +163,98 @@ begin
             NextLine => s_NextLine,           
             NextScreen => s_NextScreen,       
 
-            Offset_ch1 => s_Offset_ch1,         
-            Offset_ch2 => s_Offset_ch2,      
+            Offset_ch1 =>  s_Offset_ch1,         
+            Offset_ch2 =>  s_Offset_ch2,      
             Sig_amplitude_ch1 => s_amplitude_ch1,  
-            Sig_amplitude_ch2 => s_amplitude_ch2,  
+            Sig_amplitude_ch2 => s_amplitude_ch2, 
             
             ChannelOneSample => s_ChannelOneSample,   
             ChannelTwoSample => s_ChannelTwoSample   
         );
 
-    -- DAC 
+    -- -- DAC 
+    DAC : entity work.test_generator(platform_independent)
+        port map(
+            clk_148_5_MHz => clk_148_5_MHz,
+            reset => reset,
+    
+            nCS_DA2 => nCS_DA2,
+            D0_DA2 => D0_DA2,
+            D1_DA2 => D1_DA2,
+            SCK_DA2 => SCK_DA2
+        );
 
-    -- ADC
+    -- -- ADC
+    ADC : entity work.adc_module(platform_independent)
+        port map(
+            clk_148_5_MHz => clk_148_5_MHz,
+            reset => reset,
+
+            sampleValid => s_ValidIn_ADC,
+            sampleChannel1 => s_Sample_ADC_ch1,
+            sampleChannel2 => s_Sample_ADC_ch2,
+
+            nCS_AD1 => nCS_AD1,
+            SCK_AD1 => SCK_AD1,
+            D0_AD1 => D0_AD1,
+            D1_AD1 => D1_AD1
+        );
+
+    -- FAKE_SIGNALS : process(clk_148_5_MHz,reset) is
+    --     variable cnt : integer := 0;
+    --     variable count : integer := 0;
+    -- begin
+    --     if reset = '1' then
+    --         s_ValidIn_ADC <= '0';
+    --         cnt := 0;
+    --         count := 0;
+    --     elsif rising_edge(clk_148_5_MHz) then
+    --         if cnt < 8 then 
+    --             cnt := cnt + 1;
+    --             s_ValidIn_ADC <= '0';
+    --         else
+    --             cnt := 0;
+    --             s_ValidIn_ADC <= '1';
+    --         end if;
+
+    --         if count < 8192 then
+    --             count := count + 1;
+    --         else
+    --             count := 0;
+    --         end if;
+
+    --         if count < 4050 then
+    --             s_Sample_ADC_ch1 <= "000111110100"; --500
+    --             s_Sample_ADC_ch2 <= "000111110100"; --500
+    --         elsif count < 4200 then
+    --             s_Sample_ADC_ch1 <= "000000000000"; --0
+    --             s_Sample_ADC_ch2 <= "000000000000"; --0
+    --         else
+    --             s_Sample_ADC_ch1 <= "000111110100"; --500
+    --             s_Sample_ADC_ch2 <= "000111110100"; --500
+    --         end if;
+    --     end if;
+
+    -- end process FAKE_SIGNALS;
+
+
+    -- s_Trigger_ref <= "010110"; -- 22
+    -- s_Trigger_pos <= "010100"; -- 20
+    -- s_Offset_ch1 <= "000001"; -- 1
+    -- s_Offset_ch2 <= "000010"; -- 2
+    -- s_ChannelOneOn <= '1';
+    -- s_ChannelTwoOn <= '1';
+    -- s_ChannelOneDot <= '0';
+    -- s_ChannelTwoDot <= '0';
+    -- s_TriggerChannelOne <= '1';
+    -- s_TriggerOnRising <= '1';
+    -- s_amplitude_ch1 <= "010";
+    -- s_amplitude_ch2 <= "010";
+    -- s_TimeBase <= "000";
+
 
     -- SYSTEM FSM
-    DSO_CONTROL : entity work.dso_control(?)
+    DSO_CONTROL : entity work.dso_control(rtl)
         port map (
             clk_148_5_MHz => clk_148_5_MHz,
             reset => reset,
@@ -187,8 +265,8 @@ begin
             btn_plus => btn_plus,
             btn_minus => btn_minus,
  
-            Sel_Chan => led_matrix(0)(0 to 1),
-            Sel_Para => led_matrix(1)(0 to 2),
+            Sel_Chan => s_Sel_Chan,
+            Sel_Para => s_Sel_Para,
  
             Offset_ch1 => s_Offset_ch1,
             Sig_amplitude_ch1 => s_amplitude_ch1,
@@ -205,34 +283,60 @@ begin
             Trigger_ch1 => s_TriggerChannelOne,
             Trigger_on_rising => s_TriggerOnRising,
  
-            TimeBase => s_TimeBase);
+            TimeBase => s_TimeBase
+        );
 
     -- LED MATRIX
-    
+
+    MUX_Inst : entity work.multiplexer(mux)
+        port map(
+            clk_148_5_MHz => clk_148_5_MHz,
+            Sel_Chan => s_Sel_Chan,
+ 
+            Offset_ch1 => s_Offset_ch1,
+            Sig_amplitude_ch1 => s_amplitude_ch1,
+            ChannelOneOn => s_ChannelOneOn,
+            ChannelOneDot => s_ChannelOneDot,
+ 
+            Offset_ch2 => s_Offset_ch2,
+            Sig_amplitude_ch2 => s_amplitude_ch2,
+            ChannelTwoOn => s_ChannelTwoOn,
+            ChannelTwoDot => s_ChannelTwoDot,
+ 
+            Trigger_ref => s_Trigger_ref,
+            Trigger_pos => s_Trigger_pos,
+            Trigger_ch1 => s_TriggerChannelOne,
+            Trigger_on_rising => s_TriggerOnRising,
+ 
+            TimeBase => s_TimeBase,
+            
+            matrix_out => led_matrix
+        );
+
 
     -- 7 SEG
     DISPLAY_7_SEG1 : entity work.bcd_to_7seg(dfl)
         port map(
-            bcd => -- number to show
-            seg => seg1
+            din => "1010",
+            segments => seg1
         );
 
     DISPLAY_7_SEG2 : entity work.bcd_to_7seg(dfl)   
         port map(
-            bcd => -- number to show
-            seg => seg2
+            din => "00" & s_Sel_Chan,
+            segments => seg2
         );
 
     DISPLAY_7_SEG3 : entity work.bcd_to_7seg(dfl)
         port map(
-            bcd => -- number to show
-            seg => seg3
+            din => "1011",
+            segments => seg3
         );
 
     DISPLAY_7_SEG4 : entity work.bcd_to_7seg(dfl)
         port map(
-            bcd => -- number to show
-            seg => seg4
+            din => "0" & s_Sel_Para,
+            segments => seg4
         );
 				
 
