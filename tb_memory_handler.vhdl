@@ -127,7 +127,7 @@ begin
                 s_NextLine <= '0';
                 counter := counter + 1;
             end if;
-            if line_counter = 10 then        -- a whole screen signal is generated every 10 lines
+            if line_counter = 50 then        -- a whole screen signal is generated every 10 lines
                 s_NextScreen_sync <= '1';
                 line_counter := 0;
             else

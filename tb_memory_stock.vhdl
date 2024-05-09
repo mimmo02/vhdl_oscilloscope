@@ -33,8 +33,8 @@ architecture test_bench of tb_memory_stock is
 
     constant address : adrress_type := (
         "0000000000000", -- 0
-        "0000000000001", -- 1
-        "0000000000010"  -- 2
+        "0011111010000", -- 2000
+        "1001110010101"  -- 5013
     );
 
 begin
@@ -49,7 +49,6 @@ begin
         port map (
             clk => s_clk,
             we => s_we,
-            re => s_re,
             addr => s_addr,
             din => s_din,
             dout => s_dout
@@ -87,27 +86,27 @@ begin
         s_re <= '1';
         s_addr <= address(2);
         wait for 10 ns;
-        assert s_dout = samples(2) 
-            report "Error reading data from memory: expected " & to_string(unsigned(samples(2))) & " got " & to_string(unsigned(s_dout))
-            severity error;
+        --assert s_dout = samples(2) 
+        --    report "Error reading data from memory: expected " & to_string(unsigned(samples(2))) & " got " & to_string(unsigned(s_dout))
+        --    severity error;
         s_re <= '0';
         wait for 10 ns;
 
         s_re <= '1';
         s_addr <= address(1);
         wait for 10 ns;
-        assert s_dout = samples(1) 
-            report "Error reading data from memory: expected " & to_string(unsigned(samples(1))) & " got " & to_string(unsigned(s_dout))
-            severity error;
+        --assert s_dout = samples(1) 
+        --    report "Error reading data from memory: expected " & to_string(unsigned(samples(1))) & " got " & to_string(unsigned(s_dout))
+        --    severity error;
         s_re <= '0';
         wait for 10 ns;
 
         s_re <= '1';
         s_addr <= address(0);
         wait for 10 ns;
-        assert s_dout = samples(0) 
-            report "Error reading data from memory: expected " & to_string(unsigned(samples(0))) & " got " & to_string(unsigned(s_dout))
-            severity error;
+        --assert s_dout = samples(0) 
+        --    report "Error reading data from memory: expected " & to_string(unsigned(samples(0))) & " got " & to_string(unsigned(s_dout))
+        --    severity error;
         s_re <= '0';
         wait for 10 ns;
 

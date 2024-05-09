@@ -27,7 +27,7 @@ end entity;
 architecture dfl of bcd_to_7seg is
     --MSB segment g -  LSB segment a
     -- To understand the seven segments read the Leguan documentation 
-    type table is array (natural range 0 to 9) of std_logic_vector(6 downto 0);
+    type table is array (natural range 0 to 11) of std_logic_vector(6 downto 0);
     signal segments_table : table := (
         "0111111", -- 0
         "0000110", -- 1
@@ -38,7 +38,9 @@ architecture dfl of bcd_to_7seg is
         "1111101", -- 6
         "0000111", -- 7
         "1111111", -- 8
-        "1101111"  -- 9
+        "1101111", -- 9
+        "0111001", -- C
+        "1110011" -- P
     );
 
 begin
