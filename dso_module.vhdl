@@ -94,8 +94,8 @@ begin
 
     -- DISPLAY
 
-    s_TriggerLevel <= s_Trigger_ref & "0000";
-    s_TriggerPoint <= s_Trigger_pos & "00000";
+    --s_TriggerLevel <= s_Trigger_ref & "0000";
+    --s_TriggerPoint <= s_Trigger_pos & "00000";
     s_ChannelOneOffset <= s_Offset_ch1 & "0000";
     s_ChannelTwoOffset <= s_Offset_ch2 & "0000";
 
@@ -151,11 +151,13 @@ begin
             Trigger_pos => s_Trigger_pos,   
             Trigger_ch1 => s_TriggerChannelOne,         
             Trigger_on_rising => s_TriggerOnRising,
-            TimeBase => unsigned(s_TimeBase),            
+            TimeBase => unsigned(s_TimeBase), 
+            
+            OneShot => btn_run,
 
             -- ADC
-            sample_in_ch1 => s_Sample_ADC_ch1(11 downto 3),     
-            sample_in_ch2 => s_Sample_ADC_ch2(11 downto 3),     
+            sample_in_ch1 => s_Sample_ADC_ch1(10 downto 2),
+            sample_in_ch2 => s_Sample_ADC_ch2(10 downto 2),     
             valid_in => s_ValidIn_ADC,           
 
             -- display
@@ -169,7 +171,10 @@ begin
             Sig_amplitude_ch2 => s_amplitude_ch2, 
             
             ChannelOneSample => s_ChannelOneSample,   
-            ChannelTwoSample => s_ChannelTwoSample   
+            ChannelTwoSample => s_ChannelTwoSample,
+            
+            TriggerLevel => s_TriggerLevel,
+            TriggerPoint => s_TriggerPoint
         );
 
     -- -- DAC 
@@ -199,58 +204,6 @@ begin
             D0_AD1 => D0_AD1,
             D1_AD1 => D1_AD1
         );
-
-    -- FAKE_SIGNALS : process(clk_148_5_MHz,reset) is
-    --     variable cnt : integer := 0;
-    --     variable count : integer := 0;
-    -- begin
-    --     if reset = '1' then
-    --         s_ValidIn_ADC <= '0';
-    --         cnt := 0;
-    --         count := 0;
-    --     elsif rising_edge(clk_148_5_MHz) then
-    --         if cnt < 8 then 
-    --             cnt := cnt + 1;
-    --             s_ValidIn_ADC <= '0';
-    --         else
-    --             cnt := 0;
-    --             s_ValidIn_ADC <= '1';
-    --         end if;
-
-    --         if count < 8192 then
-    --             count := count + 1;
-    --         else
-    --             count := 0;
-    --         end if;
-
-    --         if count < 4050 then
-    --             s_Sample_ADC_ch1 <= "000111110100"; --500
-    --             s_Sample_ADC_ch2 <= "000111110100"; --500
-    --         elsif count < 4200 then
-    --             s_Sample_ADC_ch1 <= "000000000000"; --0
-    --             s_Sample_ADC_ch2 <= "000000000000"; --0
-    --         else
-    --             s_Sample_ADC_ch1 <= "000111110100"; --500
-    --             s_Sample_ADC_ch2 <= "000111110100"; --500
-    --         end if;
-    --     end if;
-
-    -- end process FAKE_SIGNALS;
-
-
-    -- s_Trigger_ref <= "010110"; -- 22
-    -- s_Trigger_pos <= "010100"; -- 20
-    -- s_Offset_ch1 <= "000001"; -- 1
-    -- s_Offset_ch2 <= "000010"; -- 2
-    -- s_ChannelOneOn <= '1';
-    -- s_ChannelTwoOn <= '1';
-    -- s_ChannelOneDot <= '0';
-    -- s_ChannelTwoDot <= '0';
-    -- s_TriggerChannelOne <= '1';
-    -- s_TriggerOnRising <= '1';
-    -- s_amplitude_ch1 <= "010";
-    -- s_amplitude_ch2 <= "010";
-    -- s_TimeBase <= "000";
 
 
     -- SYSTEM FSM
@@ -312,6 +265,7 @@ begin
             
             matrix_out => led_matrix
         );
+
 
 
     -- 7 SEG
