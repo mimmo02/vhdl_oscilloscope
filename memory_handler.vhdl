@@ -27,6 +27,8 @@ entity memory_handler is
         Trigger_on_rising   : in std_logic;                           -- trigger on rising edge
         TimeBase            : in unsigned(2 downto 0);                -- time base signal (1 to 6 samples per pixel)
 
+        OneShot             : in std_logic;                           -- one shot trigger signal
+
         -- ADC
         sample_in_ch1       : in std_logic_vector(8 downto 0);        -- sample signal channel 1
         sample_in_ch2       : in std_logic_vector(8 downto 0);        -- sample signal channel 2
@@ -43,7 +45,10 @@ entity memory_handler is
         Sig_amplitude_ch2   : in std_logic_vector(2 downto 0);        -- define amplitude of visualization signal
         
         ChannelOneSample    : out std_logic_vector(9 downto 0);       -- channel 1 sample signal
-        ChannelTwoSample    : out std_logic_vector(9 downto 0)        -- channel 2 sample signal
+        ChannelTwoSample    : out std_logic_vector(9 downto 0);       -- channel 2 sample signal
+
+        TriggerLevel        : out std_logic_vector(9 downto 0);       -- trigger level signal
+        TriggerPoint        : out std_logic_vector(10 downto 0)       -- trigger position signal
         
         );
 end entity memory_handler;
@@ -109,7 +114,7 @@ begin
     end process REG;
 
     -- compute the next state of the state machine
-    NSL : process(s_event_valid,s_event_trigger,s_event_end,state,NextScreen) is
+    NSL : process(s_event_valid,s_event_trigger,s_event_end,state,NextScreen,OneShot) is
     begin
         state_next <= state;
         case(state) is
@@ -126,7 +131,7 @@ begin
                     state_next <= END_FILL;
                 end if;
             when END_FILL =>
-                if NextScreen = '1' then
+                if NextScreen = '1' and OneShot = '0' then
                     state_next <= WAIT_PRE_TRIGGER;
                 end if;
             when others =>
@@ -345,8 +350,8 @@ begin
         end if;
     end process TRIGGER_ADDRESS_MEMORY;
 
-    s_read_address <= resize(( s_trigger_address_memory_1 - (to_integer(TimeBase) * (c_pixels_number/2)) + (to_integer(s_read_counter) * to_integer(TimeBase)) - (c_pixels_number/2) + (to_integer(unsigned(Trigger_pos)*32))) ,13) when s_ram_select = '1' else
-                      resize(( s_trigger_address_memory_2 - (to_integer(TimeBase) * (c_pixels_number/2)) + (to_integer(s_read_counter) * to_integer(TimeBase)) - (c_pixels_number/2) + (to_integer(unsigned(Trigger_pos)*32))) ,13);
+    s_read_address <= resize(( s_trigger_address_memory_1 - (to_integer(TimeBase) * (c_pixels_number/2)) + (to_integer(s_read_counter) * to_integer(TimeBase)) + (c_pixels_number/2) - (to_integer(unsigned(Trigger_pos)*32))) ,13) when s_ram_select = '1' else
+                      resize(( s_trigger_address_memory_2 - (to_integer(TimeBase) * (c_pixels_number/2)) + (to_integer(s_read_counter) * to_integer(TimeBase)) + (c_pixels_number/2) - (to_integer(unsigned(Trigger_pos)*32))) ,13);
 
 
     -- ram0 address
@@ -383,18 +388,22 @@ begin
                           resize(shift_right(unsigned(s_sample_ch1_out),1) + (unsigned(Offset_ch1)*16),10) when Sig_amplitude_ch1 = "001"  else
                           resize(shift_left(unsigned(s_sample_ch1_out),1) + (unsigned(Offset_ch1)*16),10) when Sig_amplitude_ch1 = "011"   else
                           resize(shift_left(unsigned(s_sample_ch1_out),2) + (unsigned(Offset_ch1)*16),10) when Sig_amplitude_ch1 = "100"   else
-                          resize(unsigned(s_sample_ch1_out) + (unsigned(Offset_ch1)*16),10) when Sig_amplitude_ch1 = "010" else
-                          (others => '0');
+                          resize(unsigned(s_sample_ch1_out) + (unsigned(Offset_ch1)*16),10);
 
     s_ChannelTwoSample <= resize(shift_right(unsigned(s_sample_ch2_out),2) + (unsigned(Offset_ch2)*16),10) when Sig_amplitude_ch2 = "000" else
                           resize(shift_right(unsigned(s_sample_ch2_out),1) + (unsigned(Offset_ch2)*16),10) when Sig_amplitude_ch2 = "001" else
                           resize(shift_left(unsigned(s_sample_ch2_out),1) + (unsigned(Offset_ch2)*16),10) when Sig_amplitude_ch2 = "011" else
                           resize(shift_left(unsigned(s_sample_ch2_out),2) + (unsigned(Offset_ch2)*16),10) when Sig_amplitude_ch2 = "100" else
-                          resize(unsigned(s_sample_ch2_out) + (unsigned(Offset_ch2)*16),10) when Sig_amplitude_ch2 = "010" else
-                          (others => '0');
+                          resize(unsigned(s_sample_ch2_out) + (unsigned(Offset_ch2)*16),10);
 
     ChannelOneSample <= std_logic_vector(s_ChannelOneSample);
     ChannelTwoSample <= std_logic_vector(s_ChannelTwoSample);
+
+    -- OUTPUT TRIGGER LEVEL AND POINT ----------------------------------------------------------------
+    TriggerLevel <= std_logic_vector(resize(unsigned(Trigger_ref)*16 + (unsigned(Offset_ch1)*16),10)) when Trigger_ch1 = '1' else
+                    std_logic_vector(resize(unsigned(Trigger_ref)*16 + (unsigned(Offset_ch2)*16),10));
+
+    TriggerPoint <= std_logic_vector(resize(unsigned(Trigger_pos)*32,11));
 
     -- RAM INSTANTIATION -----------------------------------------------------------------------------
 
