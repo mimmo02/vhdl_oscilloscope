@@ -16,6 +16,7 @@ end entity tb_memory_handler;
 architecture test_bench of tb_memory_handler is
 
     signal s_clk  : std_logic := '0';
+    signal s_clk2 : std_logic := '0';
     signal s_rst  : std_logic := '0';
     signal s_Trigger_ch1 : std_logic := '1';
     signal s_Trigger_on_rising : std_logic := '1';
@@ -72,6 +73,8 @@ begin
             Trigger_on_rising => s_Trigger_on_rising,
             TimeBase => s_TimeBase,
 
+            OneShot => '0',
+
             sample_in_ch1 => s_SampleOne,
             sample_in_ch2 => s_SampleTwo,
             valid_in => s_valid_in,
@@ -96,6 +99,13 @@ begin
         wait for 10 ns;
         s_clk <= not s_clk;
     end process CLOCK_GEN;
+
+    CLOCK_GEN2: process(s_clk) is
+    begin
+        if falling_edge(s_clk) then
+            s_clk2 <= not s_clk2;
+        end if;
+    end process CLOCK_GEN2;    
 
     -- Valid signal generation
     VALID_IN_GEN: process(s_clk)
@@ -133,6 +143,9 @@ begin
             else
                 s_NextScreen_sync <= '0';
             end if;
+        else
+            s_NextLine <= '0';
+            s_NextScreen_sync <= '0';
         end if;
     end process NEXT_LINE_SCREEN_GEN;
 
@@ -145,9 +158,9 @@ begin
         end if;
     end process SCREEN_COUNTER;
 
-    REG: process(s_clk) is
+    REG: process(s_clk2) is
     begin
-        if rising_edge(s_clk) then
+        if rising_edge(s_clk2) then
             s_state <= s_next_state;
         end if;
     end process REG;
@@ -197,12 +210,12 @@ begin
 
 
 
-    TEST: process(s_clk, s_NextScreen_sync) is
+    TEST: process(s_clk2, s_NextScreen_sync) is
     begin
         -- TRIGGER TEST
         if s_state = TRIGGER_TEST then 
             s_NextScreen_async <= '0';
-            if rising_edge(s_clk) and s_valid_in = '1' then
+            if rising_edge(s_clk2) and s_valid_in = '1' then
                 trigger_counter <= trigger_counter + 1;
 
                 -- first trigger test - - - - - - - - - - - - - - - - - - - - -
@@ -327,7 +340,7 @@ begin
 
 
             -- fill memory with samples
-            if rising_edge(s_clk) and s_valid_in = '1' then
+            if rising_edge(s_clk2) and s_valid_in = '1' then
                 trigger_counter <= trigger_counter + 1;
                 if trigger_counter < 2000 then                      -- first half of the buffer: 0
                     s_SampleOne <= "000000000"; -- 0
